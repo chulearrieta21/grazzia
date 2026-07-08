@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-grazzia: #3b82f6;
+  --color-grazzia-dark: #1e3a8a;
+  --color-grazzia-accent: #10b981;
+}
+
+body {
+  @apply bg-gray-900 text-gray-100 antialiased;
+}
+
+.glass-panel {
+  @apply bg-gray-800/60 backdrop-blur-md border border-gray-700/50 rounded-2xl shadow-xl;
+}

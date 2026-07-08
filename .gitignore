@@ -1,0 +1,16 @@
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/.env
+backend/*.db
+backend/*.sqlite3
+
+# Frontend
+mes-calzado-app/node_modules/
+mes-calzado-app/.next/
+mes-calzado-app/.env
+mes-calzado-app/.env.local
+
+# OS
+.DS_Store
+Thumbs.db

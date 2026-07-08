@@ -1,0 +1,197 @@
+'use client'
+
+import { useState, useRef, useEffect } from 'react'
+
+const API = 'https://grazzia-backend.onrender.com/api/v1'
+
+export default function FloorTerminal() {
+  const [userQr, setUserQr] = useState('')
+  const [batchId, setBatchId] = useState('')
+  const [operator, setOperator] = useState<any>(null)
+  
+  const [message, setMessage] = useState({ type: '', text: '' })
+  const [loading, setLoading] = useState(false)
+
+  const userQrRef = useRef<HTMLInputElement>(null)
+  const batchIdRef = useRef<HTMLInputElement>(null)
+
+  // Focus initially
+  useEffect(() => {
+    userQrRef.current?.focus()
+  }, [])
+
+  const procesarUserQr = async (qr: string) => {
+    setLoading(true)
+    setMessage({ type: '', text: '' })
+    try {
+      const res = await fetch(`${API}/qr/escanear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qr_operario: qr })
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.detail || 'Error al validar operario' })
+        setTimeout(() => setMessage(prev => prev.type === 'error' ? { type: '', text: '' } : prev), 4000)
+        setUserQr('')
+        userQrRef.current?.focus()
+      } else {
+        if (data.tipo_pago === 'por_dia') {
+          setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
+          setUserQr('')
+          userQrRef.current?.focus()
+        } else if (data.tipo_pago === 'por_produccion') {
+          setOperator(data.operario)
+          setMessage({ type: 'success', text: `Operario ${data.operario.nombre} (${data.operario.rol}) listo. Escanea la orden.` })
+          setTimeout(() => batchIdRef.current?.focus(), 100)
+        }
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error de conexión con el servidor.' })
+      setUserQr('')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const procesarBatchId = async (batch: string) => {
+    setLoading(true)
+    setMessage({ type: '', text: '' })
+    try {
+      const res = await fetch(`${API}/produccion/registrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          qr_operario: operator.codigo_qr,
+          qr_orden: batch
+        })
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.detail || 'Error al registrar producción' })
+        setTimeout(() => setMessage(prev => prev.type === 'error' ? { type: '', text: '' } : prev), 4000)
+        setUserQr('')
+        setBatchId('')
+        setOperator(null)
+        setTimeout(() => userQrRef.current?.focus(), 100)
+      } else {
+        setMessage({ 
+          type: 'success', 
+          text: `¡Éxito! ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}` 
+        })
+        setUserQr('')
+        setBatchId('')
+        setOperator(null)
+        setTimeout(() => userQrRef.current?.focus(), 100)
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error de conexión con el servidor.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Auto-submit QRs sin necesidad de presionar Enter
+  useEffect(() => {
+    if (!userQr || userQr.trim().length < 5 || operator || loading) return
+    const timeoutId = setTimeout(() => procesarUserQr(userQr.trim()), 350)
+    return () => clearTimeout(timeoutId)
+  }, [userQr])
+
+  useEffect(() => {
+    if (!batchId || batchId.trim().length < 5 || !operator || loading) return
+    const timeoutId = setTimeout(() => procesarBatchId(batchId.trim()), 350)
+    return () => clearTimeout(timeoutId)
+  }, [batchId])
+
+  const resetTerminal = () => {
+    setUserQr('')
+    setBatchId('')
+    setOperator(null)
+    setMessage({ type: '', text: '' })
+    userQrRef.current?.focus()
+  }
+
+  return (
+    <div className="terminal-container">
+      <div className="glass-card terminal-card" style={{maxWidth: '650px'}}>
+        <div className="terminal-header">
+          <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '60px', marginBottom: '1.5rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <h1>Terminal de Operario</h1>
+          <p>Sistema de Escaneo Cero Digitación - GRAZZIA</p>
+        </div>
+        
+        {message.text && (
+          <div className={`alert ${message.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+            {message.type === 'error' ? '⚠️ ' : '✅ '}
+            {message.text}
+          </div>
+        )}
+
+        {loading && <p style={{color: 'var(--accent-blue)', textAlign: 'center', marginBottom: '1rem'}}>Procesando...</p>}
+
+        <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
+          
+          <div style={{
+            background: operator ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.2)', 
+            padding: '20px', borderRadius: '12px', 
+            border: operator ? '1px solid var(--accent-green)' : '1px solid rgba(255,255,255,0.1)',
+            transition: 'all 0.3s'
+          }}>
+            <label className="modern-label" style={{textAlign: 'center', fontSize: '1.2rem', color: 'white'}}>
+              1. ESCANEA TU CÓDIGO DE OPERARIO (CARNET)
+              <input 
+                ref={userQrRef}
+                className="modern-input pin-input"
+                value={userQr} 
+                onChange={(e) => setUserQr(e.target.value)}
+                placeholder="Ej: EMP-001"
+                disabled={operator !== null || loading}
+                style={{
+                  marginTop: '10px',
+                  opacity: operator ? 0.7 : 1,
+                  borderColor: operator ? 'var(--accent-green)' : 'var(--border-color)'
+                }}
+              />
+            </label>
+            {operator && (
+              <p style={{color: 'var(--accent-green)', textAlign: 'center', marginTop: '10px', fontWeight: 'bold'}}>
+                Operario detectado: {operator.nombre} ({operator.rol})
+              </p>
+            )}
+          </div>
+
+          <div style={{
+            background: !operator ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.2)', 
+            padding: '20px', borderRadius: '12px', 
+            border: '1px solid rgba(255,255,255,0.1)',
+            opacity: !operator ? 0.5 : 1,
+            pointerEvents: !operator ? 'none' : 'auto',
+            transition: 'all 0.3s'
+          }}>
+            <label className="modern-label" style={{textAlign: 'center', fontSize: '1.2rem', color: 'white'}}>
+              2. ESCANEA EL CÓDIGO DE LA CANASTA (ORDEN)
+              <input 
+                ref={batchIdRef}
+                className="modern-input pin-input"
+                value={batchId} 
+                onChange={(e) => setBatchId(e.target.value)}
+                placeholder="Ej: OP-0462"
+                disabled={!operator || loading}
+                style={{borderColor: 'var(--accent-blue)', marginTop: '10px'}}
+              />
+            </label>
+          </div>
+
+          {operator && (
+            <button onClick={resetTerminal} className="btn-primary" style={{marginTop: '1rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)'}}>
+              Cancelar Operación
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

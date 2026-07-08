@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 0. TARIFAS POR REFERENCIA
+model ReferenceRate {
+  id        Int      @id @default(autoincrement())
+  type      String   // "plana", "confort", "señorial", "tacon"
+  reference String   @unique // Ej: "26000"
+  value     Float
+  status    String   @default("ACTIVE") // "ACTIVE", "ANULADO"
+}
+
+// 1. GESTIÓN DE USUARIOS
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      String   // "ADMIN", "JEFE", "OPERARIO"
+  qrCode    String   @unique // Código QR único del operario
+  createdAt DateTime @default(now())
+
+  movements ProductionMovement[]
+}
+
+// 2. CONTROL DE PROCESOS
+model Process {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique // "MARCA", "PRO", "PIC", "GUA", "REC", "MON", "PEG", "DET", "DES"
+  name         String
+  sequence     Int      // Para obligar el flujo secuencial 1 al 9
+  ratePerPair  Float    // Tarifa pagada al operario por cada par
+  
+  movements    ProductionMovement[]
+}
+
+// 3. GESTIÓN DE ÓRDENES
+model ProductionOrder {
+  id            String   @id // Formato de QR: "OP-2026-001"
+  client        String
+  reference     String
+  color         String
+  totalQuantity Int
+  sole          String   // Suela
+  sizes         String   // Tallas, ej: "34-43"
+  observations  String?
+  status        String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  createdAt     DateTime @default(now())
+
+  batches       ProductionBatch[]
+}
+
+// Sub-división de la orden para escaneo preciso (Canastas)
+model ProductionBatch {
+  id            String   @id // QR único de la canasta, ej: "OP-2026-001-B01"
+  orderId       String
+  quantity      Int
+  createdAt     DateTime @default(now())
+
+  order         ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  movements     ProductionMovement[]
+}
+
+// 4. REGISTRO FÍSICO Y TRAZABILIDAD (Motor Anti-Fraude)
+model ProductionMovement {
+  id                 Int      @id @default(autoincrement())
+  batchId            String
+  processId          Int
+  userId             Int
+  timestamp          DateTime @default(now())
+
+  batch        ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  process      Process         @relation(fields: [processId], references: [id])
+  user         User            @relation(fields: [userId], references: [id])
+  
+  // Evitar duplicados a nivel de DB: Un lote solo puede pasar UNA vez por un proceso
+  @@unique([batchId, processId])
+}
