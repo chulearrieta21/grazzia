@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import Barcode from 'react-barcode'
 import '../print.css' // Reuse the print CSS from the orders
 
+const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://grazzia-backend.onrender.com/api/v1'
+
 export default function ImprimirCarnets() {
   const [operarios, setOperarios] = useState<any[]>([])
 
@@ -12,7 +16,7 @@ export default function ImprimirCarnets() {
     document.body.classList.add('print-mode')
     
     // Fetch all operarios
-    fetch('https://grazzia-backend.onrender.com/api/v1/operarios')
+    fetch(`${API}/operarios`)
       .then(r => r.json())
       .then(data => setOperarios(data))
 

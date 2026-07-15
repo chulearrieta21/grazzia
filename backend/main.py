@@ -219,6 +219,21 @@ def editar_orden(orden_id):
         db.commit()
         return jsonify({"mensaje": "Orden actualizada exitosamente"}), 200
 
+# ── Eliminar orden ──────────────────────────────────────────────────────────
+@app.route("/api/v1/ordenes/<orden_id>", methods=["DELETE"])
+def eliminar_orden(orden_id):
+    with next(get_db()) as db:
+        orden = db.query(models.Orden).filter(models.Orden.id == orden_id).first()
+        if not orden:
+            return jsonify({"detail": "La orden no existe."}), 404
+        try:
+            db.delete(orden)
+            db.commit()
+            return jsonify({"mensaje": f"Orden '{orden_id}' eliminada correctamente."})
+        except IntegrityError:
+            db.rollback()
+            return jsonify({"detail": "No se puede eliminar la orden porque ya tiene producción registrada."}), 400
+
 # ── Registrar producción (destajo) ──────────────────────────────────────────
 @app.route("/api/v1/produccion/registrar", methods=["POST"])
 def registrar_produccion():
@@ -273,6 +288,17 @@ def registrar_produccion():
             "operario": operario.nombre,
             "proceso": operario.rol
         })
+
+# ── Eliminar producción ──────────────────────────────────────────────────────
+@app.route("/api/v1/produccion/<int:produccion_id>", methods=["DELETE"])
+def eliminar_produccion(produccion_id):
+    with next(get_db()) as db:
+        prod = db.query(models.Produccion).filter(models.Produccion.id == produccion_id).first()
+        if not prod:
+            return jsonify({"detail": "El registro de producción no existe."}), 404
+        db.delete(prod)
+        db.commit()
+        return jsonify({"mensaje": "Registro de producción eliminado correctamente."})
 
 
 # ── Consultar tarifa antes de registrar (preview) ───────────────────────────
@@ -341,27 +367,57 @@ def listar_produccion():
 @app.route("/api/v1/nomina", methods=["GET"])
 def calcular_nomina():
     with next(get_db()) as db:
-        # 1. Destajo
-        producciones = db.query(models.Produccion).all()
+        # Obtener parámetro de consulta 'mes' (formato YYYY-MM)
+        mes_param = request.args.get("mes")
+        if mes_param:
+            try:
+                year, month = map(int, mes_param.split("-"))
+            except ValueError:
+                now = colombia_now()
+                year, month = now.year, now.month
+        else:
+            now = colombia_now()
+            year, month = now.year, now.month
+            
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime(year, month + 1, 1)
+
+        # Inicializar nomina_dict para todos los operarios activos (no admins)
+        operarios = db.query(models.Usuario).filter(models.Usuario.es_admin == False).all()
         nomina_dict = {}
+        for o in operarios:
+            user_id = str(o.id)
+            nomina_dict[user_id] = {
+                "userId": user_id, "name": o.nombre,
+                "totalPairs": 0, "totalEarned": 0.0, "processesCount": {},
+                "totalAdvances": 0.0, "netEarned": 0.0
+            }
+
+        # 1. Destajo (Producción)
+        producciones = db.query(models.Produccion).filter(
+            models.Produccion.fecha_registro >= start_date,
+            models.Produccion.fecha_registro < end_date
+        ).all()
         
         for p in producciones:
             user_id = str(p.operario.id)
-            if user_id not in nomina_dict:
-                nomina_dict[user_id] = {
-                    "userId": user_id, "name": p.operario.nombre,
-                    "totalPairs": 0, "totalEarned": 0, "processesCount": {}
-                }
-            
-            record = nomina_dict[user_id]
-            record["totalPairs"] += p.pares_realizados
-            record["totalEarned"] += p.valor_pagar
-            
-            proceso = p.proceso_realizado
-            record["processesCount"][proceso] = record["processesCount"].get(proceso, 0) + p.pares_realizados
+            if user_id in nomina_dict:
+                record = nomina_dict[user_id]
+                record["totalPairs"] += p.pares_realizados
+                record["totalEarned"] += p.valor_pagar
+                
+                proceso = p.proceso_realizado
+                record["processesCount"][proceso] = record["processesCount"].get(proceso, 0) + p.pares_realizados
 
         # 2. Por día (Jornales)
-        jornadas = db.query(models.RegistroJornada).order_by(models.RegistroJornada.fecha.asc()).all()
+        jornadas = db.query(models.RegistroJornada).filter(
+            models.RegistroJornada.fecha >= start_date,
+            models.RegistroJornada.fecha < end_date
+        ).order_by(models.RegistroJornada.fecha.asc()).all()
+        
         from collections import defaultdict
         jornadas_por_op = defaultdict(lambda: defaultdict(list))
         for j in jornadas:
@@ -369,41 +425,51 @@ def calcular_nomina():
             
         for op_id, dias in jornadas_por_op.items():
             operario = db.query(models.Usuario).filter(models.Usuario.id == op_id).first()
-            if not operario or operario.tipo_pago != "por_dia": continue
+            if not operario or operario.tipo_pago != "por_dia":
+                continue
             
             user_id_str = str(op_id)
-            if user_id_str not in nomina_dict:
-                nomina_dict[user_id_str] = {
-                    "userId": user_id_str, "name": operario.nombre,
-                    "totalPairs": 0, "totalEarned": 0, "processesCount": {}
-                }
-            
-            record = nomina_dict[user_id_str]
-            total_horas = 0
-            
-            for fecha, registros_dia in dias.items():
-                entrada_temp = None
-                for r in registros_dia:
-                    if r.tipo == "entrada": entrada_temp = r.fecha
-                    elif r.tipo == "salida" and entrada_temp:
-                        total_horas += (r.fecha - entrada_temp).total_seconds() / 3600.0
-                        entrada_temp = None
-            
-            record["processesCount"]["Horas Trabajadas"] = round(record["processesCount"].get("Horas Trabajadas", 0) + total_horas, 2)
-            salario_hora = (operario.salario_dia or 0) / 8.0
-            record["totalEarned"] += total_horas * salario_hora
+            if user_id_str in nomina_dict:
+                record = nomina_dict[user_id_str]
+                total_horas = 0
+                
+                for fecha, registros_dia in dias.items():
+                    entrada_temp = None
+                    for r in registros_dia:
+                        if r.tipo == "entrada":
+                            entrada_temp = r.fecha
+                        elif r.tipo == "salida" and entrada_temp:
+                            total_horas += (r.fecha - entrada_temp).total_seconds() / 3600.0
+                            entrada_temp = None
+                
+                record["processesCount"]["Horas Trabajadas"] = round(record["processesCount"].get("Horas Trabajadas", 0) + total_horas, 2)
+                salario_hora = (operario.salario_dia or 0) / 8.0
+                record["totalEarned"] += total_horas * salario_hora
 
         # 3. Calcular Adelantos y Total Neto
-        adelantos = db.query(models.Adelanto).all()
+        adelantos = db.query(models.Adelanto).filter(
+            models.Adelanto.fecha >= start_date,
+            models.Adelanto.fecha < end_date
+        ).all()
+        
         adelantos_por_op = defaultdict(float)
         for a in adelantos:
             adelantos_por_op[str(a.id_operario)] += a.monto
             
+        resultado = []
         for user_id, record in nomina_dict.items():
             record["totalAdvances"] = adelantos_por_op.get(user_id, 0.0)
             record["netEarned"] = record["totalEarned"] - record["totalAdvances"]
             
-        return jsonify(list(nomina_dict.values()))
+            # Solo incluir si hay actividad en el mes
+            has_production = record["totalPairs"] > 0
+            has_hours = record["processesCount"].get("Horas Trabajadas", 0) > 0
+            has_advances = record["totalAdvances"] > 0
+            
+            if has_production or has_hours or has_advances:
+                resultado.append(record)
+                
+        return jsonify(resultado)
 
 
 # ── Gestión de Operarios ─────────────────────────────────────────────────────

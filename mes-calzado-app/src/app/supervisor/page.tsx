@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Barcode from 'react-barcode'
+import * as XLSX from 'xlsx'
 
-const API = 'https://grazzia-backend.onrender.com/api/v1'
+const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://grazzia-backend.onrender.com/api/v1'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface Operario {
@@ -24,13 +27,31 @@ function Alert({ msg, type, onClose }: { msg: string; type: 'success' | 'error';
   )
 }
 
+const ALL_SIZES: string[] = []
+for (let i = 21; i <= 43; i++) {
+  ALL_SIZES.push(i.toString())
+}
+
+const INITIAL_SIZES: Record<string, string> = {}
+for (let i = 21; i <= 43; i++) {
+  INITIAL_SIZES[i.toString()] = ''
+}
+
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = ['Órdenes', 'Operarios', 'Tarifas', 'Producción', 'Asistencia', 'Nómina', 'Avances'] as const
 type Tab = typeof TABS[number]
 
+const getCurrMonthStr = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  return `${y}-${m}`
+}
+
 export default function SupervisorDashboard() {
   const [tab, setTab] = useState<Tab>('Órdenes')
   const [alert, setAlert] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState(getCurrMonthStr())
 
   // Shared data
   const [orders, setOrders] = useState<any[]>([])
@@ -51,9 +72,54 @@ export default function SupervisorDashboard() {
   const [precioReferencia, setPrecioReferencia] = useState('')
   const [color, setColor] = useState('')
   const [sole, setSole] = useState('')
-  const [sizeMap, setSizeMap] = useState<Record<string, string>>({'34': '', '35': '', '36': '', '37': '', '38': '', '39': '', '40': '', '41': '', '42': '', '43': ''})
+  const [sizeMap, setSizeMap] = useState<Record<string, string>>(INITIAL_SIZES)
   const [observations, setObservations] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  
+  const [tallaInicio, setTallaInicio] = useState('21')
+  const [tallaFin, setTallaFin] = useState('43')
+
+  const handleTallaInicioChange = (val: string) => {
+    setTallaInicio(val)
+    const valNum = parseInt(val)
+    const currentFin = parseInt(tallaFin)
+    let newFin = tallaFin
+    if (valNum > currentFin) {
+      setTallaFin(val)
+      newFin = val
+    }
+    
+    const limitFin = parseInt(newFin)
+    const newSizeMap = { ...sizeMap }
+    Object.keys(newSizeMap).forEach(sz => {
+      const szNum = parseInt(sz)
+      if (szNum < valNum || szNum > limitFin) {
+        newSizeMap[sz] = ''
+      }
+    })
+    setSizeMap(newSizeMap)
+  }
+
+  const handleTallaFinChange = (val: string) => {
+    setTallaFin(val)
+    const valNum = parseInt(val)
+    const currentInicio = parseInt(tallaInicio)
+    let newInicio = tallaInicio
+    if (valNum < currentInicio) {
+      setTallaInicio(val)
+      newInicio = val
+    }
+    
+    const limitInicio = parseInt(newInicio)
+    const newSizeMap = { ...sizeMap }
+    Object.keys(newSizeMap).forEach(sz => {
+      const szNum = parseInt(sz)
+      if (szNum < limitInicio || szNum > valNum) {
+        newSizeMap[sz] = ''
+      }
+    })
+    setSizeMap(newSizeMap)
+  }
   
   const [isEditingOrder, setIsEditingOrder] = useState(false)
   const [editOrderId, setEditOrderId] = useState('')
@@ -87,7 +153,7 @@ export default function SupervisorDashboard() {
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchAll = () => {
-    fetchOrders(); fetchMovements(); fetchPayroll(); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos()
+    fetchOrders(); fetchMovements(); fetchPayroll(selectedMonth); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos()
   }
 
   const fetchOrders = async () => {
@@ -98,8 +164,9 @@ export default function SupervisorDashboard() {
     try { const r = await fetch(`${API}/produccion`); const d = await r.json(); if (Array.isArray(d)) setMovements(d) }
     catch { }
   }
-  const fetchPayroll = async () => {
-    try { const r = await fetch(`${API}/nomina`); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
+  const fetchPayroll = async (monthStr?: string) => {
+    const targetMonth = monthStr || selectedMonth
+    try { const r = await fetch(`${API}/nomina?mes=${targetMonth}`); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
     catch { }
   }
   const fetchOperarios = async () => {
@@ -131,9 +198,69 @@ export default function SupervisorDashboard() {
     fetchAll()
     const interval = setInterval(fetchAll, 8000)
     return () => clearInterval(interval)
-  }, [])
+  }, [selectedMonth])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleExportExcel = () => {
+    if (!payroll || payroll.length === 0) {
+      showAlert('No hay datos en la nómina para exportar.', 'error')
+      return
+    }
+
+    const headers = [
+      'Operario',
+      'Detalle Trabajo',
+      'Pares Realizados',
+      'Total Ganado',
+      'Adelantos',
+      'Neto a Pagar'
+    ]
+
+    const rows = payroll.map((p: any) => {
+      const detailStr = Object.entries(p.processesCount || {})
+        .map(([proc, qty]) => `${proc}: ${qty}`)
+        .join(', ')
+      return [
+        p.name || '',
+        detailStr,
+        p.totalPairs || 0,
+        p.totalEarned || 0,
+        p.totalAdvances || 0,
+        p.netEarned || 0
+      ]
+    })
+
+    const totalPairs = payroll.reduce((sum: number, p: any) => sum + (p.totalPairs || 0), 0)
+    const totalEarned = payroll.reduce((sum: number, p: any) => sum + (p.totalEarned || 0), 0)
+    const totalAdvances = payroll.reduce((sum: number, p: any) => sum + (p.totalAdvances || 0), 0)
+    const totalNet = payroll.reduce((sum: number, p: any) => sum + (p.netEarned || 0), 0)
+
+    rows.push([
+      'TOTALES',
+      '',
+      totalPairs,
+      totalEarned,
+      totalAdvances,
+      totalNet
+    ])
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    ws['!cols'] = [
+      { wch: 25 },
+      { wch: 45 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 }
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Nomina')
+
+    const fileName = `Nomina_Grazzia_${selectedMonth}.xlsx`
+    XLSX.writeFile(wb, fileName)
+  }
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -153,8 +280,9 @@ export default function SupervisorDashboard() {
       if (!r.ok) { showAlert(d.detail, 'error'); return }
 
       setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setPrecioReferencia('');
-      setSizeMap({'34': '', '35': '', '36': '', '37': '', '38': '', '39': '', '40': '', '41': '', '42': '', '43': ''}); 
+      setSizeMap(INITIAL_SIZES); 
       setObservations(''); setIsEditingOrder(false); setEditOrderId('');
+      setTallaInicio('21'); setTallaFin('43');
       fetchOrders()
       showAlert(d.mensaje, 'success')
     } catch { showAlert('Error al guardar la orden.', 'error') }
@@ -162,8 +290,9 @@ export default function SupervisorDashboard() {
 
   const cancelEditOrder = () => {
     setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setPrecioReferencia('');
-    setSizeMap({'34': '', '35': '', '36': '', '37': '', '38': '', '39': '', '40': '', '41': '', '42': '', '43': ''}); 
+    setSizeMap(INITIAL_SIZES); 
     setObservations(''); setIsEditingOrder(false); setEditOrderId('');
+    setTallaInicio('21'); setTallaFin('43');
   }
 
   const handleEditOrder = (o: any) => {
@@ -177,14 +306,27 @@ export default function SupervisorDashboard() {
     setObservations(o.observations)
     setPrecioReferencia(o.precio_referencia !== null ? String(o.precio_referencia) : '')
     
-    const newSizeMap: Record<string, string> = {'34': '', '35': '', '36': '', '37': '', '38': '', '39': '', '40': '', '41': '', '42': '', '43': ''}
+    const newSizeMap = { ...INITIAL_SIZES }
+    let minSz = 43
+    let maxSz = 21
+    let hasSizesObj = false
     if (o.sizes) {
       o.sizes.split(',').forEach((part: string) => {
         const [sz, qty] = part.trim().split(':')
-        if (sz && qty) newSizeMap[sz] = qty
+        if (sz && qty) {
+          newSizeMap[sz] = qty
+          if (parseInt(qty) > 0) {
+            const szNum = parseInt(sz)
+            if (szNum < minSz) minSz = szNum
+            if (szNum > maxSz) maxSz = szNum
+            hasSizesObj = true
+          }
+        }
       })
     }
     setSizeMap(newSizeMap)
+    setTallaInicio(hasSizesObj ? String(minSz) : '21')
+    setTallaFin(hasSizesObj ? String(maxSz) : '43')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -215,6 +357,29 @@ export default function SupervisorDashboard() {
       showAlert(d.mensaje, 'success')
       fetchOperarios()
     } catch { showAlert('Error al eliminar operario.', 'error') }
+  }
+
+  const handleDeleteOrder = async (id: string) => {
+    if (!confirm(`¿Eliminar la orden ${id}? Esta acción no se puede deshacer.`)) return
+    try {
+      const r = await fetch(`${API}/ordenes/${id}`, { method: 'DELETE' })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail, 'error'); return }
+      showAlert(d.mensaje, 'success')
+      fetchOrders()
+    } catch { showAlert('Error al eliminar la orden.', 'error') }
+  }
+
+  const handleDeleteProduccion = async (id: number) => {
+    if (!confirm('¿Eliminar este registro de producción?')) return
+    try {
+      const r = await fetch(`${API}/produccion/${id}`, { method: 'DELETE' })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail, 'error'); return }
+      showAlert(d.mensaje, 'success')
+      fetchMovements()
+      fetchPayroll()
+    } catch { showAlert('Error al eliminar el registro de producción.', 'error') }
   }
 
   const handleGuardarTarifaRef = async (e: React.FormEvent) => {
@@ -375,19 +540,38 @@ export default function SupervisorDashboard() {
                 </label>
               </div>
 
+              <div className="flex-row" style={{ marginBottom: '1.2rem' }}>
+                <label className="modern-label" style={{ flex: 1, marginBottom: 0 }}>Desde Talla
+                  <select className="modern-input" value={tallaInicio} onChange={e => handleTallaInicioChange(e.target.value)}>
+                    {ALL_SIZES.map(sz => (
+                      <option key={sz} value={sz}>{sz}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="modern-label" style={{ flex: 1, marginBottom: 0 }}>Hasta Talla
+                  <select className="modern-input" value={tallaFin} onChange={e => handleTallaFinChange(e.target.value)}>
+                    {ALL_SIZES.map(sz => (
+                      <option key={sz} value={sz}>{sz}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               <label className="modern-label" style={{ marginBottom: '0.5rem' }}>Curva de Tallas (Ingresa la cantidad por talla)</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '5px', marginBottom: '1rem' }}>
-                {Object.keys(sizeMap).map(sz => (
-                  <div key={sz} style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{sz}</div>
-                    <input 
-                      type="number" min="0" className="modern-input" 
-                      style={{ padding: '8px 2px', textAlign: 'center', fontSize: '1rem' }} 
-                      value={sizeMap[sz]} 
-                      onChange={e => setSizeMap({...sizeMap, [sz]: e.target.value})} 
-                    />
-                  </div>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(55px, 1fr))', gap: '5px', marginBottom: '1rem' }}>
+                {Object.keys(sizeMap)
+                  .filter(sz => parseInt(sz) >= parseInt(tallaInicio) && parseInt(sz) <= parseInt(tallaFin))
+                  .map(sz => (
+                    <div key={sz} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{sz}</div>
+                      <input 
+                        type="number" min="0" className="modern-input" 
+                        style={{ padding: '8px 2px', textAlign: 'center', fontSize: '1rem' }} 
+                        value={sizeMap[sz]} 
+                        onChange={e => setSizeMap({...sizeMap, [sz]: e.target.value})} 
+                      />
+                    </div>
+                  ))}
               </div>
 
               <div className="flex-row" style={{ marginBottom: '1rem' }}>
@@ -479,6 +663,13 @@ export default function SupervisorDashboard() {
                             padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem'
                           }}>
                             PDF
+                          </button>
+                          <button onClick={() => handleDeleteOrder(o.id)} style={{
+                            background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)',
+                            color: '#f87171', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
+                            transition: 'all .2s'
+                          }}>
+                            🗑️ Eliminar
                           </button>
                         </td>
                       </tr>
@@ -723,9 +914,9 @@ export default function SupervisorDashboard() {
           <div className="glass-card" style={{ padding: '1.5rem' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">
-                <thead><tr><th>Hora</th><th>Operario</th><th>Orden</th><th>Proceso</th></tr></thead>
+                <thead><tr><th>Hora</th><th>Operario</th><th>Orden</th><th>Proceso</th><th></th></tr></thead>
                 <tbody>
-                  {movements.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin movimientos registrados.</td></tr>}
+                  {movements.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin movimientos registrados.</td></tr>}
                   {movements.map((m: any) => {
                     const dateObj = m.createdAt ? new Date(m.createdAt) : m.timestamp ? new Date(m.timestamp) : null;
                     const dateFormatted = dateObj && !isNaN(dateObj.getTime())
@@ -743,6 +934,9 @@ export default function SupervisorDashboard() {
                           <span className="badge badge-pending" style={{ marginLeft: '8px' }}>{m.batch?.id || m.batchId}</span>
                         </td>
                         <td style={{ fontWeight: 'bold', color: '#34d399' }}>{m.process?.name}</td>
+                        <td>
+                          <button style={btnDanger} onClick={() => handleDeleteProduccion(m.id)}>×</button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -837,7 +1031,32 @@ export default function SupervisorDashboard() {
       {/* ── TAB: Nómina ── */}
       {tab === 'Nómina' && (
         <div>
-          <h2>Reporte de Nómina Automatizada</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0 }}>Reporte de Nómina Automatizada</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <label htmlFor="payroll-month" style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.95rem' }}>Mes de Nómina:</label>
+              <input
+                id="payroll-month"
+                type="month"
+                className="modern-input"
+                style={{ width: 'auto', padding: '8px 12px', minWidth: '180px' }}
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              />
+              <button
+                onClick={() => window.open(`/imprimir/nomina?mes=${selectedMonth}`, '_blank')}
+                className="btn-export-pdf"
+              >
+                Exportar PDF
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="btn-export-excel"
+              >
+                Exportar Excel
+              </button>
+            </div>
+          </div>
           <div className="glass-card" style={{ padding: '1.5rem', borderColor: 'rgba(16,185,129,0.3)' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">

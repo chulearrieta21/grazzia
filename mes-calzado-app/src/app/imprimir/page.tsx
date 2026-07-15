@@ -2,8 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Barcode from 'react-barcode'
+import QRCode from 'react-qr-code'
 import './print.css'
+
+const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://grazzia-backend.onrender.com/api/v1'
 
 function ImprimirOrdenesContent() {
   const searchParams = useSearchParams()
@@ -13,7 +17,7 @@ function ImprimirOrdenesContent() {
   useEffect(() => {
     const ids = searchParams.get('ids')
     if (ids) {
-      fetch('https://grazzia-backend.onrender.com/api/v1/ordenes')
+      fetch(`${API}/ordenes`)
         .then(res => res.json())
         .then(data => {
           const selectedIds = ids.split(',')
@@ -35,14 +39,10 @@ function ImprimirOrdenesContent() {
   if (orders.length === 0) return <div style={{ padding: '2rem' }}>No se encontraron órdenes para imprimir.</div>
 
   const parseSizes = (sizeString: string) => {
-    // Si viene en formato "35:1, 36:2", intentamos parsearlo
     const sizeMap: Record<string, string> = {}
-    for (let i = 34; i <= 43; i++) sizeMap[i.toString()] = ''
+    for (let i = 21; i <= 43; i++) sizeMap[i.toString()] = ''
     
     if (sizeString) {
-      // Intento simple: asume que es formato de pares
-      // Pero si solo dice "37-40", simplemente lo dejamos, no podemos deducir cantidades exactas
-      // Vamos a poner el valor crudo en la columna 34 si no tiene el formato esperado
       if (sizeString.includes(':') || sizeString.includes('=')) {
         const pairs = sizeString.replace(/,/g, ' ').split(/\s+/)
         pairs.forEach(p => {
@@ -52,11 +52,46 @@ function ImprimirOrdenesContent() {
           }
         })
       } else {
-        // Fallback: lo ponemos a un lado
         sizeMap['34'] = sizeString
       }
     }
     return sizeMap
+  }
+
+  const getOrderRange = (sizesString: string) => {
+    let isNino = false
+    if (sizesString) {
+      const pairs = sizesString.replace(/,/g, ' ').split(/\s+/)
+      pairs.forEach(p => {
+        const parts = p.split(/[:=]/)
+        if (parts.length === 2) {
+          const szNum = parseInt(parts[0])
+          if (!isNaN(szNum) && szNum <= 33 && parseInt(parts[1]) > 0) {
+            isNino = true
+          }
+        }
+      })
+    }
+    
+    if (isNino) {
+      return {
+        type: 'nino',
+        sizes: ['21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33'],
+        widths: ['16%', '8%', '10%', '5%', '9%', ...Array(13).fill('2.3%'), '8%', '14%'],
+        titleColSpan: 13,
+        emptyCellsProcHeader: 9,
+        emptyCellsProcData: 16
+      }
+    } else {
+      return {
+        type: 'adulto',
+        sizes: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43'],
+        widths: ['16%', '8%', '10%', '5%', '9%', ...Array(10).fill('3%'), '8%', '14%'],
+        titleColSpan: 10,
+        emptyCellsProcHeader: 6,
+        emptyCellsProcData: 13
+      }
+    }
   }
 
   return (
@@ -77,6 +112,7 @@ function ImprimirOrdenesContent() {
       <div className="tickets-wrapper">
         {orders.map(o => {
           const sizeMap = parseSizes(o.sizes)
+          const rangeInfo = getOrderRange(o.sizes)
           return (
             <div key={o.id} className="order-print-group">
               {/* Card 1: Hoja de Ruta Principal (Con Logo y Procesos) */}
@@ -84,34 +120,23 @@ function ImprimirOrdenesContent() {
                 <div className="ticket-card" style={{ marginBottom: '1rem' }}>
                   <table className="ticket-table">
                     <colgroup>
-                      <col style={{ width: '16%' }} />
-                      <col style={{ width: '8%' }} />
-                      <col style={{ width: '10%' }} />
-                      <col style={{ width: '5%' }} />
-                      <col style={{ width: '9%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '3%' }} />
-                      <col style={{ width: '8%' }} />
-                      <col style={{ width: '14%' }} />
+                      {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
                     </colgroup>
                     <tbody>
                       {/* Fila 1: Cabecera */}
                       <tr className="header-row">
-                        <td colSpan={5} className="logo-cell" style={{ borderRight: 'none' }}>
+                        <td colSpan={4} className="logo-cell" style={{ borderRight: 'none' }}>
                           <div className="logo-container" style={{ display: 'flex', alignItems: 'center', padding: '10px' }}>
                             <img src="/logo.png" alt="GRAZZIA" style={{ maxHeight: '60px', objectFit: 'contain' }} />
                           </div>
                         </td>
-                        <td colSpan={12} className="title-cell" style={{ textAlign: 'center', fontFamily: 'Georgia, serif', color: '#64748b', fontSize: '24px', fontWeight: 'bold', borderLeft: 'none' }}>
+                        <td colSpan={rangeInfo.titleColSpan} className="title-cell" style={{ textAlign: 'center', fontFamily: 'Georgia, serif', color: '#64748b', fontSize: '24px', fontWeight: 'bold', borderLeft: 'none', borderRight: 'none' }}>
                           ORDEN DE PRODUCCION
+                        </td>
+                        <td colSpan={3} style={{ textAlign: 'center', padding: '5px', borderLeft: 'none', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <QRCode value={o.id} size={55} style={{ height: 'auto', maxWidth: '100%', width: '55px' }} />
+                          </div>
                         </td>
                       </tr>
 
@@ -122,16 +147,9 @@ function ImprimirOrdenesContent() {
                         <td>COLOR</td>
                         <td>PARES</td>
                         <td>SUELA</td>
-                        <td className="sz">34</td>
-                        <td className="sz">35</td>
-                        <td className="sz">36</td>
-                        <td className="sz">37</td>
-                        <td className="sz">38</td>
-                        <td className="sz">39</td>
-                        <td className="sz">40</td>
-                        <td className="sz">41</td>
-                        <td className="sz">42</td>
-                        <td className="sz">43</td>
+                        {rangeInfo.sizes.map(sz => (
+                          <td key={sz} className="sz">{sz}</td>
+                        ))}
                         <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
                         <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>OBSERVACIONES</td>
                       </tr>
@@ -143,16 +161,9 @@ function ImprimirOrdenesContent() {
                         <td>{o.color ? o.color.toUpperCase() : ''}</td>
                         <td><strong style={{ fontSize: '1.2rem' }}>{o.totalQuantity}</strong></td>
                         <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                        <td className="sz-data">{sizeMap['34']}</td>
-                        <td className="sz-data">{sizeMap['35']}</td>
-                        <td className="sz-data">{sizeMap['36']}</td>
-                        <td className="sz-data">{sizeMap['37']}</td>
-                        <td className="sz-data">{sizeMap['38']}</td>
-                        <td className="sz-data">{sizeMap['39']}</td>
-                        <td className="sz-data">{sizeMap['40']}</td>
-                        <td className="sz-data">{sizeMap['41']}</td>
-                        <td className="sz-data">{sizeMap['42']}</td>
-                        <td className="sz-data">{sizeMap['43']}</td>
+                        {rangeInfo.sizes.map(sz => (
+                          <td key={sz} className="sz-data">{sizeMap[sz]}</td>
+                        ))}
                         <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{o.id.split('-').pop()}</td>
                         <td className="sz-data"></td>
                       </tr>
@@ -168,12 +179,9 @@ function ImprimirOrdenesContent() {
                         <td>PEG</td>
                         <td>DET</td>
                         <td>DES</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
+                        {Array(rangeInfo.emptyCellsProcHeader).fill(null).map((_, idx) => (
+                          <td key={idx}></td>
+                        ))}
                         <td colSpan={2} rowSpan={2} className="obs-data" style={{ color: 'red', fontWeight: 'bold', fontSize: '20px', verticalAlign: 'middle', textAlign: 'center', textTransform: 'uppercase' }}>
                           {o.observations ? o.observations.toUpperCase() : ''}
                         </td>
@@ -183,19 +191,9 @@ function ImprimirOrdenesContent() {
                       <tr className="data-row proc-data">
                         <td className="marca-data" style={{ color: 'red', fontWeight: 'bold' }}>GRAZZIA</td>
                         <td className="bold" style={{ fontWeight: 'bold' }}>SB</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
+                        {Array(rangeInfo.emptyCellsProcData).fill(null).map((_, idx) => (
+                          <td key={idx}></td>
+                        ))}
                       </tr>
                     </tbody>
                   </table>
@@ -211,23 +209,7 @@ function ImprimirOrdenesContent() {
                     <div className="ticket-card" style={{ marginBottom: '1rem' }}>
                       <table className="ticket-table">
                         <colgroup>
-                          <col style={{ width: '16%' }} />
-                          <col style={{ width: '8%' }} />
-                          <col style={{ width: '10%' }} />
-                          <col style={{ width: '5%' }} />
-                          <col style={{ width: '9%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '8%' }} />
-                          <col style={{ width: '14%' }} />
+                          {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
                         </colgroup>
                         <tbody>
                           {/* Fila 1: Subcabeceras */}
@@ -237,18 +219,11 @@ function ImprimirOrdenesContent() {
                             <td>COLOR</td>
                             <td>PARES</td>
                             <td>SUELA</td>
-                            <td className="sz">34</td>
-                            <td className="sz">35</td>
-                            <td className="sz">36</td>
-                            <td className="sz">37</td>
-                            <td className="sz">38</td>
-                            <td className="sz">39</td>
-                            <td className="sz">40</td>
-                            <td className="sz">41</td>
-                            <td className="sz">42</td>
-                            <td className="sz">43</td>
+                            {rangeInfo.sizes.map(sz => (
+                              <td key={sz} className="sz">{sz}</td>
+                            ))}
                             <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
-                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>OBSERVACIONES</td>
+                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
                           </tr>
 
                           {/* Fila 2: Datos de la colilla */}
@@ -258,18 +233,15 @@ function ImprimirOrdenesContent() {
                             <td>{o.color ? o.color.toUpperCase() : ''}</td>
                             <td><strong style={{ fontSize: '1.2rem' }}>{batch1 ? batch1.quantity : ''}</strong></td>
                             <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['34'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['35'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['36'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['37'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['38'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['39'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['40'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['41'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['42'] : ''}</td>
-                            <td className="sz-data">{batch1 ? sizeMap['43'] : ''}</td>
+                            {rangeInfo.sizes.map(sz => (
+                              <td key={sz} className="sz-data">{batch1 ? sizeMap[sz] : ''}</td>
+                            ))}
                             <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch1 ? batch1.id.split('-').pop() : (o.id.split('-').pop() + '-B001')}</td>
-                            <td className="sz-data"></td>
+                            <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                <QRCode value={batch1 ? batch1.id : `${o.id}-B001`} size={45} style={{ height: 'auto', maxWidth: '100%', width: '45px' }} />
+                              </div>
+                            </td>
                           </tr>
                         </tbody>
                       </table>
@@ -287,23 +259,7 @@ function ImprimirOrdenesContent() {
                     <div className="ticket-card" style={{ marginBottom: '1rem' }}>
                       <table className="ticket-table">
                         <colgroup>
-                          <col style={{ width: '16%' }} />
-                          <col style={{ width: '8%' }} />
-                          <col style={{ width: '10%' }} />
-                          <col style={{ width: '5%' }} />
-                          <col style={{ width: '9%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '3%' }} />
-                          <col style={{ width: '8%' }} />
-                          <col style={{ width: '14%' }} />
+                          {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
                         </colgroup>
                         <tbody>
                           {/* Fila 1: Subcabeceras */}
@@ -313,18 +269,11 @@ function ImprimirOrdenesContent() {
                             <td>COLOR</td>
                             <td>PARES</td>
                             <td>SUELA</td>
-                            <td className="sz">34</td>
-                            <td className="sz">35</td>
-                            <td className="sz">36</td>
-                            <td className="sz">37</td>
-                            <td className="sz">38</td>
-                            <td className="sz">39</td>
-                            <td className="sz">40</td>
-                            <td className="sz">41</td>
-                            <td className="sz">42</td>
-                            <td className="sz">43</td>
+                            {rangeInfo.sizes.map(sz => (
+                              <td key={sz} className="sz">{sz}</td>
+                            ))}
                             <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
-                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>OBSERVACIONES</td>
+                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
                           </tr>
 
                           {/* Fila 2: Datos de la colilla */}
@@ -334,18 +283,15 @@ function ImprimirOrdenesContent() {
                             <td>{o.color ? o.color.toUpperCase() : ''}</td>
                             <td><strong style={{ fontSize: '1.2rem' }}>{batch2 ? batch2.quantity : ''}</strong></td>
                             <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['34'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['35'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['36'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['37'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['38'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['39'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['40'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['41'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['42'] : ''}</td>
-                            <td className="sz-data">{batch2 ? sizeMap['43'] : ''}</td>
+                            {rangeInfo.sizes.map(sz => (
+                              <td key={sz} className="sz-data">{batch2 ? sizeMap[sz] : ''}</td>
+                            ))}
                             <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch2 ? batch2.id.split('-').pop() : (o.id.split('-').pop() + '-B002')}</td>
-                            <td className="sz-data"></td>
+                            <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                <QRCode value={batch2 ? batch2.id : `${o.id}-B002`} size={45} style={{ height: 'auto', maxWidth: '100%', width: '45px' }} />
+                              </div>
+                            </td>
                           </tr>
                         </tbody>
                       </table>
