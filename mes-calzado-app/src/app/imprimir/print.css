@@ -16,12 +16,12 @@
 .order-print-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   width: 100%;
   page-break-inside: avoid;
   border-bottom: 1.5px dashed #000;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
 }
 
 .ticket-card {
@@ -39,13 +39,13 @@
 
 .ticket-table td {
   border: 1px solid #000;
-  padding: 3px; /* Reducido de 4px para ahorrar espacio */
+  padding: 2px 3px;
 }
 
 /* Header Row */
 .header-row td {
   border-bottom: 1.5px solid #000;
-  padding: 4px; /* Reducido de 8px */
+  padding: 2px 4px;
 }
 
 .logo-container {
@@ -91,8 +91,8 @@
 
 /* Data Row */
 .data-row td {
-  height: 20px; /* Reducido de 25px */
-  font-size: 12px;
+  height: 16px;
+  font-size: 11px;
 }
 
 .data-row .sz-data {
@@ -135,8 +135,8 @@
     padding: 0;
   }
   
-  /* Salto de página cada 3 órdenes completas */
-  .order-print-group:nth-child(3n) {
+  /* Salto de página cada 4 órdenes completas */
+  .order-print-group:nth-child(4n) {
     page-break-after: always;
   }
   .order-print-group:last-child {

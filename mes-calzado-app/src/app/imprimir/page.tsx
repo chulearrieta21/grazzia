@@ -201,34 +201,6 @@ function ImprimirOrdenesContent() {
                         </div>
                       </td>
                     </tr>
-
-                    {/* Fila 4: Procesos */}
-                    <tr className="subheaders proc-header">
-                      <td>MARCA</td>
-                      <td>PRO</td>
-                      <td>PIC</td>
-                      <td>GUA</td>
-                      <td>REC</td>
-                      <td>MON</td>
-                      <td>PEG</td>
-                      <td>DET</td>
-                      <td>DES</td>
-                      {Array(rangeInfo.emptyCellsProcHeader).fill(null).map((_, idx) => (
-                        <td key={idx}></td>
-                      ))}
-                      <td colSpan={2} rowSpan={2} className="obs-data" style={{ color: 'red', fontWeight: 'bold', fontSize: '20px', verticalAlign: 'middle', textAlign: 'center', textTransform: 'uppercase' }}>
-                        {o.observations ? o.observations.toUpperCase() : ''}
-                      </td>
-                    </tr>
-
-                    {/* Fila 5: Espacios de Procesos */}
-                    <tr className="data-row proc-data">
-                      <td className="marca-data" style={{ color: 'red', fontWeight: 'bold' }}>GRAZZIA</td>
-                      <td className="bold" style={{ fontWeight: 'bold' }}>SB</td>
-                      {Array(rangeInfo.emptyCellsProcData).fill(null).map((_, idx) => (
-                        <td key={idx}></td>
-                      ))}
-                    </tr>
                   </tbody>
                 </table>
               </div>

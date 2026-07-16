@@ -48,6 +48,7 @@ model ProductionOrder {
   sole          String   // Suela
   sizes         String   // Tallas, ej: "34-43"
   observations  String?
+  marca         String?  // Marca del calzado (ej: GRAZZIA, NIKE)
   status        String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
   createdAt     DateTime @default(now())
 

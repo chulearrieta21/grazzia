@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { id, client, reference, color, totalQuantity, sole, sizes, observations, batchSize } = body
+    const { id, client, reference, color, totalQuantity, sole, sizes, observations, batchSize, marca } = body
     
     if (!id || !client || !reference || !totalQuantity || !batchSize) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
         sole: sole || '',
         sizes: sizes || '',
         observations: observations || '',
+        marca: marca || '',
         status: 'PENDING',
         batches: {
           create: batchesData

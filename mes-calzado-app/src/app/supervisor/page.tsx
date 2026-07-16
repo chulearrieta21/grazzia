@@ -100,6 +100,7 @@ export default function SupervisorDashboard() {
   const [precioReferencia, setPrecioReferencia] = useState('')
   const [color, setColor] = useState('')
   const [sole, setSole] = useState('')
+  const [marca, setMarca] = useState('')
   const [sizeMap, setSizeMap] = useState<Record<string, string>>(INITIAL_SIZES)
   const [observations, setObservations] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -433,12 +434,12 @@ export default function SupervisorDashboard() {
 
       const r = await fetch(url, {
         method: method, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: orderId, client, reference, color, sole, sizes: sizesStr, observations, totalQuantity, batchSize: totalQuantity, precio_referencia: precioReferencia })
+        body: JSON.stringify({ id: orderId, client, reference, color, sole, marca, sizes: sizesStr, observations, totalQuantity, batchSize: totalQuantity, precio_referencia: precioReferencia })
       })
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
 
-      setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setPrecioReferencia('');
+      setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca(''); setPrecioReferencia('');
       setSizeMap(INITIAL_SIZES); 
       setObservations(''); setIsEditingOrder(false); setEditOrderId('');
       setTallaInicio('21'); setTallaFin('43');
@@ -448,7 +449,7 @@ export default function SupervisorDashboard() {
   }
 
   const cancelEditOrder = () => {
-    setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setPrecioReferencia('');
+    setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca(''); setPrecioReferencia('');
     setSizeMap(INITIAL_SIZES); 
     setObservations(''); setIsEditingOrder(false); setEditOrderId('');
     setTallaInicio('21'); setTallaFin('43');
@@ -462,6 +463,7 @@ export default function SupervisorDashboard() {
     setReference(o.reference)
     setColor(o.color)
     setSole(o.sole)
+    setMarca(o.marca || '')
     setObservations(o.observations)
     setPrecioReferencia(o.precio_referencia !== null ? String(o.precio_referencia) : '')
     
@@ -856,6 +858,9 @@ export default function SupervisorDashboard() {
               <div className="flex-row" style={{ marginBottom: '1rem' }}>
                 <label className="modern-label" style={{ flex: 1 }}>Suela
                   <input className="modern-input" value={sole} onChange={e => setSole(e.target.value)} required placeholder="Ej. Goma" />
+                </label>
+                <label className="modern-label" style={{ flex: 1 }}>Marca
+                  <input className="modern-input" value={marca} onChange={e => setMarca(e.target.value)} placeholder="Ej. GRAZZIA" />
                 </label>
               </div>
 
