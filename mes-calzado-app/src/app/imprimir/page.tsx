@@ -17,7 +17,7 @@ function ImprimirOrdenesContent() {
   useEffect(() => {
     const ids = searchParams.get('ids')
     if (ids) {
-      fetch(`${API}/ordenes`)
+      fetch(`${API}/ordenes?ids=${ids}`)
         .then(res => res.json())
         .then(data => {
           const selectedIds = ids.split(',')
@@ -115,188 +115,179 @@ function ImprimirOrdenesContent() {
           const rangeInfo = getOrderRange(o.sizes)
           return (
             <div key={o.id} className="order-print-group">
-              {/* Card 1: Hoja de Ruta Principal (Con Logo y Procesos) */}
-              <div className="ticket-container-wrapper" style={{ pageBreakInside: 'avoid' }}>
-                <div className="ticket-card" style={{ marginBottom: '1rem' }}>
-                  <table className="ticket-table">
-                    <colgroup>
-                      {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
-                    </colgroup>
-                    <tbody>
-                      {/* Fila 1: Cabecera */}
-                      <tr className="header-row">
-                        <td colSpan={4} className="logo-cell" style={{ borderRight: 'none' }}>
-                          <div className="logo-container" style={{ display: 'flex', alignItems: 'center', padding: '10px' }}>
-                            <img src="/logo.png" alt="GRAZZIA" style={{ maxHeight: '60px', objectFit: 'contain' }} />
-                          </div>
-                        </td>
-                        <td colSpan={rangeInfo.titleColSpan} className="title-cell" style={{ textAlign: 'center', fontFamily: 'Georgia, serif', color: '#64748b', fontSize: '24px', fontWeight: 'bold', borderLeft: 'none', borderRight: 'none' }}>
-                          ORDEN DE PRODUCCION
-                        </td>
-                        <td colSpan={3} style={{ textAlign: 'center', padding: '5px', borderLeft: 'none', verticalAlign: 'middle' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                            <QRCode value={o.id} size={55} style={{ height: 'auto', maxWidth: '100%', width: '55px' }} />
-                          </div>
-                        </td>
-                      </tr>
+              {/* Card 1: Hoja de Ruta Principal */}
+              <div className="ticket-card" style={{ marginBottom: '0.2rem' }}>
+                <table className="ticket-table">
+                  <colgroup>
+                    {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
+                  </colgroup>
+                  <tbody>
+                    {/* Fila 1: Cabecera */}
+                    <tr className="header-row">
+                      <td colSpan={4} className="logo-cell" style={{ borderRight: 'none' }}>
+                        <div className="logo-container" style={{ display: 'flex', alignItems: 'center', padding: '3px' }}>
+                          <img src="/logo.png" alt="GRAZZIA" style={{ maxHeight: '36px', objectFit: 'contain' }} />
+                        </div>
+                      </td>
+                      <td colSpan={rangeInfo.titleColSpan} className="title-cell" style={{ textAlign: 'center', fontFamily: 'Georgia, serif', color: '#64748b', fontSize: '20px', fontWeight: 'bold', borderLeft: 'none', borderRight: 'none' }}>
+                        ORDEN DE PRODUCCION
+                      </td>
+                      <td colSpan={3} style={{ textAlign: 'center', padding: '5px', borderLeft: 'none', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          <QRCode value={o.id} size={42} style={{ height: 'auto', maxWidth: '100%', width: '42px' }} />
+                        </div>
+                      </td>
+                    </tr>
 
-                      {/* Fila 2: Subcabeceras */}
-                      <tr className="subheaders">
-                        <td>CLIENTE</td>
-                        <td>REF</td>
-                        <td>COLOR</td>
-                        <td>PARES</td>
-                        <td>SUELA</td>
-                        {rangeInfo.sizes.map(sz => (
-                          <td key={sz} className="sz">{sz}</td>
-                        ))}
-                        <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
-                        <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>OBSERVACIONES</td>
-                      </tr>
+                    {/* Fila 2: Subcabeceras */}
+                    <tr className="subheaders">
+                      <td>CLIENTE</td>
+                      <td>REF</td>
+                      <td>COLOR</td>
+                      <td>PARES</td>
+                      <td>SUELA</td>
+                      {rangeInfo.sizes.map(sz => (
+                        <td key={sz} className="sz">{sz}</td>
+                      ))}
+                      <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
+                      <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>OBSERVACIONES</td>
+                    </tr>
 
-                      {/* Fila 3: Datos de la orden */}
-                      <tr className="data-row">
-                        <td>{o.client ? o.client.toUpperCase() : ''}</td>
-                        <td>{o.reference}</td>
-                        <td>{o.color ? o.color.toUpperCase() : ''}</td>
-                        <td><strong style={{ fontSize: '1.2rem' }}>{o.totalQuantity}</strong></td>
-                        <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                        {rangeInfo.sizes.map(sz => (
-                          <td key={sz} className="sz-data">{sizeMap[sz]}</td>
-                        ))}
-                        <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{o.id.split('-').pop()}</td>
-                        <td className="sz-data"></td>
-                      </tr>
+                    {/* Fila 3: Datos de la orden */}
+                    <tr className="data-row">
+                      <td>{o.client ? o.client.toUpperCase() : ''}</td>
+                      <td>{o.reference}</td>
+                      <td>{o.color ? o.color.toUpperCase() : ''}</td>
+                      <td><strong style={{ fontSize: '1.2rem' }}>{o.totalQuantity}</strong></td>
+                      <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
+                      {rangeInfo.sizes.map(sz => (
+                        <td key={sz} className="sz-data">{sizeMap[sz]}</td>
+                      ))}
+                      <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{o.id.split('-').pop()}</td>
+                      <td className="sz-data"></td>
+                    </tr>
 
-                      {/* Fila 4: Procesos */}
-                      <tr className="subheaders proc-header">
-                        <td>MARCA</td>
-                        <td>PRO</td>
-                        <td>PIC</td>
-                        <td>GUA</td>
-                        <td>REC</td>
-                        <td>MON</td>
-                        <td>PEG</td>
-                        <td>DET</td>
-                        <td>DES</td>
-                        {Array(rangeInfo.emptyCellsProcHeader).fill(null).map((_, idx) => (
-                          <td key={idx}></td>
-                        ))}
-                        <td colSpan={2} rowSpan={2} className="obs-data" style={{ color: 'red', fontWeight: 'bold', fontSize: '20px', verticalAlign: 'middle', textAlign: 'center', textTransform: 'uppercase' }}>
-                          {o.observations ? o.observations.toUpperCase() : ''}
-                        </td>
-                      </tr>
+                    {/* Fila 4: Procesos */}
+                    <tr className="subheaders proc-header">
+                      <td>MARCA</td>
+                      <td>PRO</td>
+                      <td>PIC</td>
+                      <td>GUA</td>
+                      <td>REC</td>
+                      <td>MON</td>
+                      <td>PEG</td>
+                      <td>DET</td>
+                      <td>DES</td>
+                      {Array(rangeInfo.emptyCellsProcHeader).fill(null).map((_, idx) => (
+                        <td key={idx}></td>
+                      ))}
+                      <td colSpan={2} rowSpan={2} className="obs-data" style={{ color: 'red', fontWeight: 'bold', fontSize: '20px', verticalAlign: 'middle', textAlign: 'center', textTransform: 'uppercase' }}>
+                        {o.observations ? o.observations.toUpperCase() : ''}
+                      </td>
+                    </tr>
 
-                      {/* Fila 5: Espacios de Procesos */}
-                      <tr className="data-row proc-data">
-                        <td className="marca-data" style={{ color: 'red', fontWeight: 'bold' }}>GRAZZIA</td>
-                        <td className="bold" style={{ fontWeight: 'bold' }}>SB</td>
-                        {Array(rangeInfo.emptyCellsProcData).fill(null).map((_, idx) => (
-                          <td key={idx}></td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="ticket-separator" style={{ borderTop: '1.5px dashed #000', marginBottom: '1.5rem', pageBreakAfter: 'avoid' }} />
+                    {/* Fila 5: Espacios de Procesos */}
+                    <tr className="data-row proc-data">
+                      <td className="marca-data" style={{ color: 'red', fontWeight: 'bold' }}>GRAZZIA</td>
+                      <td className="bold" style={{ fontWeight: 'bold' }}>SB</td>
+                      {Array(rangeInfo.emptyCellsProcData).fill(null).map((_, idx) => (
+                        <td key={idx}></td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              {/* Tarjeta 2: Colilla 1 (Sin Logo y Sin Procesos) */}
+              {/* Tarjeta 2: Colilla 1 */}
               {(() => {
                 const batch1 = o.batches && o.batches.length > 0 ? o.batches[0] : null;
                 return (
-                  <div className="ticket-container-wrapper" style={{ pageBreakInside: 'avoid' }}>
-                    <div className="ticket-card" style={{ marginBottom: '1rem' }}>
-                      <table className="ticket-table">
-                        <colgroup>
-                          {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
-                        </colgroup>
-                        <tbody>
-                          {/* Fila 1: Subcabeceras */}
-                          <tr className="subheaders">
-                            <td>CLIENTE</td>
-                            <td>REF</td>
-                            <td>COLOR</td>
-                            <td>PARES</td>
-                            <td>SUELA</td>
-                            {rangeInfo.sizes.map(sz => (
-                              <td key={sz} className="sz">{sz}</td>
-                            ))}
-                            <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
-                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
-                          </tr>
+                  <div className="ticket-card" style={{ marginBottom: '0.2rem' }}>
+                    <table className="ticket-table">
+                      <colgroup>
+                        {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
+                      </colgroup>
+                      <tbody>
+                        {/* Fila 1: Subcabeceras */}
+                        <tr className="subheaders">
+                          <td>CLIENTE</td>
+                          <td>REF</td>
+                          <td>COLOR</td>
+                          <td>PARES</td>
+                          <td>SUELA</td>
+                          {rangeInfo.sizes.map(sz => (
+                            <td key={sz} className="sz">{sz}</td>
+                          ))}
+                          <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
+                          <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
+                        </tr>
 
-                          {/* Fila 2: Datos de la colilla */}
-                          <tr className="data-row">
-                            <td>{o.client ? o.client.toUpperCase() : ''}</td>
-                            <td>{o.reference}</td>
-                            <td>{o.color ? o.color.toUpperCase() : ''}</td>
-                            <td><strong style={{ fontSize: '1.2rem' }}>{batch1 ? batch1.quantity : ''}</strong></td>
-                            <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                            {rangeInfo.sizes.map(sz => (
-                              <td key={sz} className="sz-data">{batch1 ? sizeMap[sz] : ''}</td>
-                            ))}
-                            <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch1 ? batch1.id.split('-').pop() : (o.id.split('-').pop() + '-B001')}</td>
-                            <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
-                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                <QRCode value={batch1 ? batch1.id : `${o.id}-B001`} size={45} style={{ height: 'auto', maxWidth: '100%', width: '45px' }} />
-                              </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="ticket-separator" style={{ borderTop: '1.5px dashed #000', marginBottom: '1.5rem', pageBreakAfter: 'avoid' }} />
+                        {/* Fila 2: Datos de la colilla */}
+                        <tr className="data-row">
+                          <td>{o.client ? o.client.toUpperCase() : ''}</td>
+                          <td>{o.reference}</td>
+                          <td>{o.color ? o.color.toUpperCase() : ''}</td>
+                          <td><strong style={{ fontSize: '1.2rem' }}>{batch1 ? batch1.quantity : ''}</strong></td>
+                          <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
+                          {rangeInfo.sizes.map(sz => (
+                            <td key={sz} className="sz-data">{batch1 ? sizeMap[sz] : ''}</td>
+                          ))}
+                          <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch1 ? batch1.id.split('-').pop() : (o.id.split('-').pop() + '-B001')}</td>
+                          <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                              <QRCode value={batch1 ? batch1.id : `${o.id}-B001`} size={35} style={{ height: 'auto', maxWidth: '100%', width: '35px' }} />
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}
 
-              {/* Tarjeta 3: Colilla 2 (Sin Logo y Sin Procesos) */}
+              {/* Tarjeta 3: Colilla 2 */}
               {(() => {
                 const batch2 = o.batches && o.batches.length > 1 ? o.batches[1] : null;
                 return (
-                  <div className="ticket-container-wrapper" style={{ pageBreakInside: 'avoid' }}>
-                    <div className="ticket-card" style={{ marginBottom: '1rem' }}>
-                      <table className="ticket-table">
-                        <colgroup>
-                          {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
-                        </colgroup>
-                        <tbody>
-                          {/* Fila 1: Subcabeceras */}
-                          <tr className="subheaders">
-                            <td>CLIENTE</td>
-                            <td>REF</td>
-                            <td>COLOR</td>
-                            <td>PARES</td>
-                            <td>SUELA</td>
-                            {rangeInfo.sizes.map(sz => (
-                              <td key={sz} className="sz">{sz}</td>
-                            ))}
-                            <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
-                            <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
-                          </tr>
+                  <div className="ticket-card" style={{ marginBottom: '0.2rem' }}>
+                    <table className="ticket-table">
+                      <colgroup>
+                        {rangeInfo.widths.map((w, idx) => <col key={idx} style={{ width: w }} />)}
+                      </colgroup>
+                      <tbody>
+                        {/* Fila 1: Subcabeceras */}
+                        <tr className="subheaders">
+                          <td>CLIENTE</td>
+                          <td>REF</td>
+                          <td>COLOR</td>
+                          <td>PARES</td>
+                          <td>SUELA</td>
+                          {rangeInfo.sizes.map(sz => (
+                            <td key={sz} className="sz">{sz}</td>
+                          ))}
+                          <td className="ord-title" style={{ color: 'red', fontWeight: 'bold' }}>N ORDEN</td>
+                          <td className="obs-title" style={{ color: 'red', fontWeight: 'bold' }}>ESCANEAR QR</td>
+                        </tr>
 
-                          {/* Fila 2: Datos de la colilla */}
-                          <tr className="data-row">
-                            <td>{o.client ? o.client.toUpperCase() : ''}</td>
-                            <td>{o.reference}</td>
-                            <td>{o.color ? o.color.toUpperCase() : ''}</td>
-                            <td><strong style={{ fontSize: '1.2rem' }}>{batch2 ? batch2.quantity : ''}</strong></td>
-                            <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
-                            {rangeInfo.sizes.map(sz => (
-                              <td key={sz} className="sz-data">{batch2 ? sizeMap[sz] : ''}</td>
-                            ))}
-                            <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch2 ? batch2.id.split('-').pop() : (o.id.split('-').pop() + '-B002')}</td>
-                            <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
-                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                <QRCode value={batch2 ? batch2.id : `${o.id}-B002`} size={45} style={{ height: 'auto', maxWidth: '100%', width: '45px' }} />
-                              </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="ticket-separator" style={{ borderTop: '1.5px dashed #000', marginBottom: '1.5rem', pageBreakAfter: 'avoid' }} />
+                        {/* Fila 2: Datos de la colilla */}
+                        <tr className="data-row">
+                          <td>{o.client ? o.client.toUpperCase() : ''}</td>
+                          <td>{o.reference}</td>
+                          <td>{o.color ? o.color.toUpperCase() : ''}</td>
+                          <td><strong style={{ fontSize: '1.2rem' }}>{batch2 ? batch2.quantity : ''}</strong></td>
+                          <td>{o.sole ? o.sole.toUpperCase() : ''}</td>
+                          {rangeInfo.sizes.map(sz => (
+                            <td key={sz} className="sz-data">{batch2 ? sizeMap[sz] : ''}</td>
+                          ))}
+                          <td className="ord-data" style={{ color: 'red', fontWeight: 'bold' }}>{batch2 ? batch2.id.split('-').pop() : (o.id.split('-').pop() + '-B002')}</td>
+                          <td style={{ textAlign: 'center', padding: '4px', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                              <QRCode value={batch2 ? batch2.id : `${o.id}-B002`} size={35} style={{ height: 'auto', maxWidth: '100%', width: '35px' }} />
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 );
               })()}

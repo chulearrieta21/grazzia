@@ -4,6 +4,7 @@ from datetime import datetime, date, timezone, timedelta
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from database import engine, get_db
+from sqlalchemy.orm import joinedload
 import models
 
 def colombia_now():
@@ -131,8 +132,13 @@ def escanear_qr():
 # ── Órdenes ────────────────────────────────────────────────────────────────
 @app.route("/api/v1/ordenes", methods=["GET"])
 def listar_ordenes():
+    ids_param = request.args.get("ids")
     with next(get_db()) as db:
-        ordenes = db.query(models.Orden).order_by(models.Orden.fecha_creacion.desc()).all()
+        query = db.query(models.Orden).options(joinedload(models.Orden.lotes))
+        if ids_param:
+            ids_list = ids_param.split(",")
+            query = query.filter(models.Orden.id.in_(ids_list))
+        ordenes = query.order_by(models.Orden.fecha_creacion.desc()).all()
         resultado = []
         for o in ordenes:
             batches = [{"id": l.id, "quantity": l.cantidad} for l in o.lotes]

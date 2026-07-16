@@ -1,6 +1,6 @@
 .print-container {
   font-family: Arial, sans-serif;
-  padding: 20px;
+  padding: 5px;
   background: white;
   color: black;
   min-height: 100vh;
@@ -9,54 +9,65 @@
 .tickets-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 10px;
+}
+
+/* Cada orden completa se apila verticalmente de forma compacta */
+.order-print-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  page-break-inside: avoid;
+  border-bottom: 1.5px dashed #000;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .ticket-card {
   width: 100%;
-  max-width: 1000px; /* Ancho similar a una hoja horizontal o formato ticket ancho */
   page-break-inside: avoid;
 }
 
 .ticket-table {
   width: 100%;
   border-collapse: collapse;
-  border: 2px solid #000;
+  border: 1.5px solid #000;
   text-align: center;
   font-size: 11px;
 }
 
 .ticket-table td {
   border: 1px solid #000;
-  padding: 4px;
+  padding: 3px; /* Reducido de 4px para ahorrar espacio */
 }
 
 /* Header Row */
 .header-row td {
-  border-bottom: 2px solid #000;
-  padding: 10px;
+  border-bottom: 1.5px solid #000;
+  padding: 4px; /* Reducido de 8px */
 }
 
 .logo-container {
   display: flex;
   align-items: center;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
 .logo-icon {
-  margin-right: 10px;
-  font-size: 28px;
+  margin-right: 6px;
+  font-size: 22px;
 }
 
 .title-cell {
   text-align: right;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
   color: #888;
-  letter-spacing: 1px;
-  padding-right: 20px !important;
+  letter-spacing: 0.5px;
+  padding-right: 15px !important;
 }
 
 /* Subheaders */
@@ -69,7 +80,7 @@
 
 .subheaders .sz {
   font-weight: bold;
-  width: 25px; /* Columnas de tallas pequeñas */
+  width: 25px;
 }
 
 .subheaders .ord-title, 
@@ -80,7 +91,7 @@
 
 /* Data Row */
 .data-row td {
-  height: 25px;
+  height: 20px; /* Reducido de 25px */
   font-size: 12px;
 }
 
@@ -91,22 +102,22 @@
 .data-row .ord-data {
   color: red;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .data-row .obs-data {
   color: red;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 14px; /* Reducido ligeramente de 15px */
   vertical-align: middle;
-  padding: 10px;
+  padding: 4px;
 }
 
 /* Proc Data */
 .marca-data {
   color: red !important;
   font-weight: bold !important;
-  font-size: 14px !important;
+  font-size: 12px !important;
 }
 
 .bold {
@@ -123,15 +134,12 @@
   .print-container {
     padding: 0;
   }
-  .ticket-card {
-    margin-bottom: 40px;
-  }
   
-  /* Forzar salto de página cada 5 tickets máximo */
-  .ticket-card:nth-child(5n) {
+  /* Salto de página cada 3 órdenes completas */
+  .order-print-group:nth-child(3n) {
     page-break-after: always;
   }
-  .ticket-card:last-child {
+  .order-print-group:last-child {
     page-break-after: auto;
   }
 
