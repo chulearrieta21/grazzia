@@ -300,7 +300,7 @@ export default function SupervisorDashboard() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Asistencias')
 
-    let fileSuffix = asistenciaFilterType
+    let fileSuffix: string = asistenciaFilterType
     if (asistenciaFilterType === 'dia') fileSuffix = asistenciaFilterDia
     if (asistenciaFilterType === 'semana') fileSuffix = asistenciaFilterSemana
     if (asistenciaFilterType === 'mes') fileSuffix = asistenciaFilterMes
