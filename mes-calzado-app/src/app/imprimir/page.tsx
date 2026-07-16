@@ -201,6 +201,14 @@ function ImprimirOrdenesContent() {
                         </div>
                       </td>
                     </tr>
+
+                    {/* Fila 4: Marca */}
+                    <tr>
+                      <td className="subheaders" style={{ textAlign: 'center', fontWeight: 'normal', textTransform: 'uppercase', fontSize: '10px', background: '#f8f8f8' }}>MARCA</td>
+                      <td colSpan={rangeInfo.sizes.length + 3} className="marca-data" style={{ color: 'red', fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase', textAlign: 'left', paddingLeft: '6px' }}>
+                        {o.marca ? o.marca.toUpperCase() : ''}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

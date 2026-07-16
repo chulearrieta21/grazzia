@@ -33,6 +33,7 @@ class Orden(Base):
     total_pares = Column(Integer, nullable=False)
     tallas = Column(String, nullable=False) # Guardado como JSON string en SQLite
     observaciones = Column(String, nullable=True)
+    marca = Column(String(100), default="GRAZZIA", nullable=True)
     estado = Column(String(20), default="PENDING")
     precio_referencia = Column(Float, nullable=True) # Precio global opcional para la orden
     fecha_creacion = Column(DateTime, default=colombia_now)

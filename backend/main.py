@@ -163,7 +163,7 @@ def listar_ordenes():
             batches = [{"id": l.id, "quantity": l.cantidad} for l in o.lotes]
             resultado.append({
                 "id": o.id, "client": o.cliente or "", "reference": o.referencia,
-                "color": o.color, "sole": o.suela or "", "totalQuantity": o.total_pares,
+                "color": o.color, "sole": o.suela or "", "marca": o.marca or "GRAZZIA", "totalQuantity": o.total_pares,
                 "sizes": o.tallas, "observations": o.observaciones or "", "status": o.estado,
                 "precio_referencia": o.precio_referencia,
                 "batches": batches
@@ -186,6 +186,7 @@ def crear_orden():
             referencia=datos["reference"],
             color=datos["color"],
             suela=datos.get("sole", ""),
+            marca=str(datos.get("marca") or "GRAZZIA").strip() or "GRAZZIA",
             total_pares=int(datos["totalQuantity"]),
             tallas=datos.get("sizes", ""),
             observaciones=datos.get("observations", ""),
@@ -236,6 +237,7 @@ def editar_orden(orden_id):
                 referencia=datos.get("reference", orden.referencia),
                 color=datos.get("color", orden.color),
                 suela=datos.get("sole", orden.suela),
+                marca=str(datos.get("marca", orden.marca) or "GRAZZIA").strip() or "GRAZZIA",
                 total_pares=orden.total_pares,
                 tallas=orden.tallas,
                 observaciones=datos.get("observations", orden.observaciones),
@@ -296,6 +298,7 @@ def editar_orden(orden_id):
             orden.referencia = datos.get("reference", orden.referencia)
             orden.color = datos.get("color", orden.color)
             orden.suela = datos.get("sole", orden.suela)
+            orden.marca = str(datos.get("marca", orden.marca) or "GRAZZIA").strip() or "GRAZZIA"
             orden.observaciones = datos.get("observations", orden.observaciones)
             orden.precio_referencia = precio_ref
 

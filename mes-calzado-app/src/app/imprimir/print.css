@@ -135,8 +135,8 @@
     padding: 0;
   }
   
-  /* Salto de página cada 4 órdenes completas */
-  .order-print-group:nth-child(4n) {
+  /* Salto de página cada 3 órdenes completas */
+  .order-print-group:nth-child(3n) {
     page-break-after: always;
   }
   .order-print-group:last-child {

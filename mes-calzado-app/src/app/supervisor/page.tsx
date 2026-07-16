@@ -100,7 +100,7 @@ export default function SupervisorDashboard() {
   const [precioReferencia, setPrecioReferencia] = useState('')
   const [color, setColor] = useState('')
   const [sole, setSole] = useState('')
-  const [marca, setMarca] = useState('')
+  const [marca, setMarca] = useState('GRAZZIA')
   const [sizeMap, setSizeMap] = useState<Record<string, string>>(INITIAL_SIZES)
   const [observations, setObservations] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
@@ -439,7 +439,7 @@ export default function SupervisorDashboard() {
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
 
-      setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca(''); setPrecioReferencia('');
+      setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca('GRAZZIA'); setPrecioReferencia('');
       setSizeMap(INITIAL_SIZES); 
       setObservations(''); setIsEditingOrder(false); setEditOrderId('');
       setTallaInicio('21'); setTallaFin('43');
@@ -449,7 +449,7 @@ export default function SupervisorDashboard() {
   }
 
   const cancelEditOrder = () => {
-    setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca(''); setPrecioReferencia('');
+    setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca('GRAZZIA'); setPrecioReferencia('');
     setSizeMap(INITIAL_SIZES); 
     setObservations(''); setIsEditingOrder(false); setEditOrderId('');
     setTallaInicio('21'); setTallaFin('43');
