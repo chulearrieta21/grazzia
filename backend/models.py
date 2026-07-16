@@ -36,6 +36,7 @@ class Orden(Base):
     estado = Column(String(20), default="PENDING")
     precio_referencia = Column(Float, nullable=True) # Precio global opcional para la orden
     fecha_creacion = Column(DateTime, default=colombia_now)
+    fecha_completado = Column(DateTime, nullable=True)  # Cuando todos los procesos terminan
 
     lotes = relationship("Lote", back_populates="orden", cascade="all, delete-orphan")
 
@@ -124,3 +125,24 @@ class Adelanto(Base):
     observacion = Column(String, nullable=True)
 
     operario = relationship("Usuario")
+
+
+class Proceso(Base):
+    """Procesos o roles configurables por el usuario, con orden de secuencia de producción."""
+    __tablename__ = "procesos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(50), unique=True, nullable=False)
+    orden = Column(Integer, default=0, nullable=False)  # Posición en la secuencia de producción
+
+
+class Bitacora(Base):
+    """Historial de acciones realizadas en el sistema."""
+    __tablename__ = "bitacora"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(50), nullable=False)          # ORDEN, PRODUCCION, OPERARIO, TARIFA, PROCESO, AVANCE
+    accion = Column(String(20), nullable=False)         # CREAR, EDITAR, ELIMINAR, REGISTRAR
+    descripcion = Column(String(500), nullable=False)   # Texto legible del evento
+    detalle = Column(String(1000), nullable=True)       # JSON / texto adicional
+    fecha = Column(DateTime, default=colombia_now)

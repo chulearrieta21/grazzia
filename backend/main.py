@@ -52,8 +52,27 @@ def resolver_tarifa(db, orden: models.Orden, operario: models.Usuario) -> float 
     return global_tarifa.precio_por_par if global_tarifa else None
 
 
+def registrar_bitacora(db, tipo: str, accion: str, descripcion: str, detalle: str = None):
+    """Registra una acción en la bitácora del sistema."""
+    try:
+        entrada = models.Bitacora(
+            tipo=tipo, accion=accion,
+            descripcion=descripcion, detalle=detalle
+        )
+        db.add(entrada)
+        # No hacemos commit aquí, se hace junto con la acción principal
+    except Exception:
+        pass  # No bloquear si falla el log
+
+
 # ── Datos de ejemplo ────────────────────────────────────────────────────────
 with next(get_db()) as db:
+    if not db.query(models.Proceso).first():
+        default_procesos = ['Picado', 'Picador Auxiliar', 'Guarnizado', 'Recamado', 'Montado', 'Pegado', 'Forrado', 'Detallado', 'Despachado', 'Independiente']
+        for p_name in default_procesos:
+            db.add(models.Proceso(nombre=p_name))
+        db.commit()
+
     if not db.query(models.Usuario).first():
         db.add(models.Usuario(nombre="Fabián", rol="Cortador",  es_admin=False, codigo_qr="EMP-001", tipo_pago="por_produccion"))
         db.add(models.Usuario(nombre="Carlos", rol="Pegador",   es_admin=False, codigo_qr="EMP-002", tipo_pago="por_produccion"))
@@ -185,6 +204,8 @@ def crear_orden():
             db.add(models.Lote(id=lote_id, id_orden=orden.id, cantidad=qty))
             remaining -= qty
             
+        db.commit()
+        registrar_bitacora(db, "ORDEN", "CREAR", f"Orden '{orden.id}' creada para cliente '{orden.cliente}', referencia '{orden.referencia}', {orden.total_pares} pares")
         db.commit()
         return jsonify({"mensaje": "Orden y lotes creados"}), 201
 
@@ -363,16 +384,60 @@ def registrar_produccion():
         ).first():
             return jsonify({"detail": f"Doble cobro: '{operario.rol}' ya fue registrado en {lote.id}."}), 400
 
+        # ── Validar orden de procesos ──────────────────────────────────────────
+        proceso_actual = db.query(models.Proceso).filter(
+            func.lower(models.Proceso.nombre) == func.lower(operario.rol)
+        ).first()
+        if proceso_actual:
+            # Obtener el proceso anterior en secuencia
+            proceso_anterior = db.query(models.Proceso).filter(
+                models.Proceso.orden < proceso_actual.orden
+            ).order_by(models.Proceso.orden.desc()).first()
+
+            if proceso_anterior:
+                # Verificar si el proceso anterior fue completado para esta orden
+                completado_anterior = db.query(models.Produccion).join(models.Lote).filter(
+                    models.Lote.id_orden == orden.id,
+                    func.lower(models.Produccion.proceso_realizado) == func.lower(proceso_anterior.nombre)
+                ).first()
+                if not completado_anterior:
+                    return jsonify({
+                        "detail": f"Orden de proceso incumplida: el proceso anterior '{proceso_anterior.nombre}' aun no ha sido completado para la orden '{orden.id}'."
+                    }), 400
+        # ──────────────────────────────────────────────────────────────────────
+
         precio = resolver_tarifa(db, orden, operario)
         if precio is None:
             return jsonify({"detail": f"No hay tarifa configurada para '{operario.rol}' en '{orden.referencia}'."}), 400
 
         valor_total = precio * pares_reportados
-        db.add(models.Produccion(
+        prod = models.Produccion(
             id_lote=lote.id, id_operario=operario.id,
             proceso_realizado=operario.rol, pares_realizados=pares_reportados,
             valor_pagar=valor_total, fecha_registro=colombia_now()
-        ))
+        )
+        db.add(prod)
+        registrar_bitacora(db, "PRODUCCION", "REGISTRAR",
+            f"{operario.nombre} ({operario.rol}) registr\u00f3 {pares_reportados} pares de la orden '{orden.id}' (Ref: {orden.referencia}) a ${precio:,.0f}/par. Total: ${valor_total:,.0f}",
+            f"lote={lote.id}, operario_id={operario.id}"
+        )
+        db.flush()  # Persist prod before checking completion
+
+        # ── Verificar si todos los procesos están completos para marcar la orden ──
+        todos_procesos = db.query(models.Proceso).order_by(models.Proceso.orden.asc()).all()
+        nombres_todos = {p.nombre.lower() for p in todos_procesos}
+        producciones_orden = db.query(models.Produccion).join(models.Lote).filter(
+            models.Lote.id_orden == orden.id
+        ).all()
+        completados = {p.proceso_realizado.lower() for p in producciones_orden}
+        if nombres_todos and nombres_todos.issubset(completados):
+            orden.estado = "COMPLETADA"
+            orden.fecha_completado = colombia_now()
+            registrar_bitacora(db, "ORDEN", "COMPLETAR",
+                f"Orden '{orden.id}' (Ref: {orden.referencia}) completada. Todos los procesos finalizados."
+            )
+        # ──────────────────────────────────────────────────────────────────────
+
         db.commit()
         return jsonify({
             "mensaje": "Producción registrada",
@@ -439,22 +504,36 @@ def tarifa_preview():
 @app.route("/api/v1/produccion", methods=["GET"])
 def listar_produccion():
     with next(get_db()) as db:
-        producciones = db.query(models.Produccion).order_by(models.Produccion.fecha_registro.desc()).limit(100).all()
+        producciones = db.query(models.Produccion).options(
+            joinedload(models.Produccion.lote).joinedload(models.Lote.orden),
+            joinedload(models.Produccion.operario)
+        ).order_by(models.Produccion.fecha_registro.desc()).limit(200).all()
         resultado = []
         for p in producciones:
+            orden = p.lote.orden if p.lote else None
             resultado.append({
                 "id": p.id,
                 "userId": str(p.operario.id),
                 "user": {"name": p.operario.nombre},
+                "proceso": p.proceso_realizado,
                 "process": {"name": p.proceso_realizado},
+                "lote": p.id_lote,
+                "pares": p.pares_realizados,
+                "valor": p.valor_pagar,
                 "batch": {
-                    "id": p.lote.id,
+                    "id": p.id_lote,
                     "quantity": p.pares_realizados,
                     "order": {
-                        "reference": p.lote.orden.referencia,
-                        "color": p.lote.orden.color
+                        "id": orden.id if orden else None,
+                        "reference": orden.referencia if orden else None,
+                        "color": orden.color if orden else None,
+                        "cliente": orden.cliente if orden else None,
                     }
                 },
+                "orden": orden.id if orden else None,
+                "referencia": orden.referencia if orden else None,
+                "color": orden.color if orden else None,
+                "cliente": orden.cliente if orden else None,
                 "createdAt": p.fecha_registro.isoformat()
             })
         return jsonify(resultado)
@@ -506,6 +585,20 @@ def calcular_nomina():
                 
                 proceso = p.proceso_realizado
                 record["processesCount"][proceso] = record["processesCount"].get(proceso, 0) + p.pares_realizados
+                
+                # Detalle por referencia
+                orden = p.lote.orden if p.lote else None
+                ref = orden.referencia if orden else "Sin referencia"
+                color = orden.color if orden else ""
+                orden_id = orden.id if orden else ""
+                ref_key = f"{ref} ({color})"
+                if "detalleReferencias" not in record:
+                    record["detalleReferencias"] = {}
+                if ref_key not in record["detalleReferencias"]:
+                    record["detalleReferencias"][ref_key] = {"pares": 0, "valor": 0.0, "ordenes": set(), "proceso": proceso}
+                record["detalleReferencias"][ref_key]["pares"] += p.pares_realizados
+                record["detalleReferencias"][ref_key]["valor"] += p.valor_pagar
+                record["detalleReferencias"][ref_key]["ordenes"].add(orden_id)
 
         # 2. Por día (Jornales)
         jornadas = db.query(models.RegistroJornada).filter(
@@ -555,6 +648,11 @@ def calcular_nomina():
         for user_id, record in nomina_dict.items():
             record["totalAdvances"] = adelantos_por_op.get(user_id, 0.0)
             record["netEarned"] = record["totalEarned"] - record["totalAdvances"]
+            
+            # Convertir sets a listas para que sean JSON-serializable
+            if "detalleReferencias" in record:
+                for ref_key, det in record["detalleReferencias"].items():
+                    det["ordenes"] = list(det["ordenes"])
             
             # Solo incluir si hay actividad en el mes
             has_production = record["totalPairs"] > 0
@@ -623,12 +721,55 @@ def crear_operario():
                 es_admin=False
             )
             db.add(nuevo)
+            registrar_bitacora(db, "OPERARIO", "CREAR",
+                f"Operario '{nombre}' creado con rol '{rol}' ({tipo_pago}). C\u00f3digo QR: {codigo_generado}"
+            )
             db.commit()
-            return jsonify({"mensaje": f"Operario '{nombre}' creado con código {codigo_generado}.", "id": nuevo.id}), 201
+            return jsonify({"mensaje": f"Operario '{nombre}' creado con c\u00f3digo {codigo_generado}.", "id": nuevo.id}), 201
     except IntegrityError as ie:
         return jsonify({"detail": f"Error de integridad en la base de datos: {str(ie.orig)}"}), 400
     except Exception as e:
         return jsonify({"detail": f"Error interno al crear el operario: {str(e)}"}), 500
+
+@app.route("/api/v1/operarios/<int:operario_id>", methods=["PUT"])
+def editar_operario(operario_id):
+    datos = request.json
+    nombre      = datos.get("nombre", "").strip()
+    rol         = datos.get("rol", "").strip()
+    tipo_pago   = datos.get("tipo_pago", "por_produccion")
+    salario_dia = datos.get("salario_dia")
+    precio_par  = datos.get("precio_por_par")
+
+    if not nombre or not rol:
+        return jsonify({"detail": "Nombre y rol son obligatorios."}), 400
+
+    try:
+        precio_individual = float(precio_par) if tipo_pago == "por_produccion" and precio_par is not None and precio_par != "" else None
+    except (ValueError, TypeError):
+        return jsonify({"detail": "El precio por par debe ser un número válido."}), 400
+
+    try:
+        salario_diario = float(salario_dia) if tipo_pago == "por_dia" and salario_dia is not None and salario_dia != "" else None
+    except (ValueError, TypeError):
+        return jsonify({"detail": "El salario por día debe ser un número válido."}), 400
+
+    try:
+        with next(get_db()) as db:
+            operario = db.query(models.Usuario).filter(models.Usuario.id == operario_id).first()
+            if not operario:
+                return jsonify({"detail": "Operario no encontrado."}), 404
+
+            operario.nombre = nombre
+            operario.rol = rol
+            operario.tipo_pago = tipo_pago
+            operario.salario_dia = salario_diario
+            operario.precio_por_par = precio_individual
+            db.commit()
+            return jsonify({"mensaje": f"Operario '{nombre}' actualizado exitosamente."}), 200
+    except IntegrityError as ie:
+        return jsonify({"detail": f"Error de integridad en la base de datos: {str(ie.orig)}"}), 400
+    except Exception as e:
+        return jsonify({"detail": f"Error interno al editar el operario: {str(e)}"}), 500
 
 from sqlalchemy.exc import IntegrityError
 
@@ -647,6 +788,172 @@ def eliminar_operario(operario_id):
             db.rollback()
             return jsonify({"detail": "No se puede eliminar el operario porque ya tiene registros de producción o asistencia vinculados."}), 400
 
+
+# ── Gestión de Procesos (Roles Dinámicos) ───────────────────────────────────
+@app.route("/api/v1/procesos", methods=["GET"])
+def listar_procesos():
+    with next(get_db()) as db:
+        procesos = db.query(models.Proceso).order_by(models.Proceso.orden.asc()).all()
+        return jsonify([{"id": p.id, "nombre": p.nombre, "orden": p.orden} for p in procesos])
+
+@app.route("/api/v1/procesos", methods=["POST"])
+def crear_proceso():
+    datos = request.json
+    nombre = datos.get("nombre", "").strip()
+    if not nombre:
+        return jsonify({"detail": "El nombre del proceso es obligatorio."}), 400
+
+    with next(get_db()) as db:
+        existente = db.query(models.Proceso).filter(
+            func.lower(models.Proceso.nombre) == func.lower(nombre)
+        ).first()
+        if existente:
+            return jsonify({"detail": f"El proceso '{nombre}' ya existe."}), 400
+
+        max_orden = db.query(func.max(models.Proceso.orden)).scalar() or 0
+        nuevo = models.Proceso(nombre=nombre, orden=max_orden + 1)
+        db.add(nuevo)
+        db.commit()
+        return jsonify({"mensaje": f"Proceso '{nombre}' creado exitosamente.", "id": nuevo.id}), 201
+
+@app.route("/api/v1/procesos/<int:proceso_id>", methods=["PUT"])
+def editar_proceso(proceso_id):
+    datos = request.json
+    nuevo_nombre = datos.get("nombre", "").strip()
+    if not nuevo_nombre:
+        return jsonify({"detail": "El nombre del proceso es obligatorio."}), 400
+
+    with next(get_db()) as db:
+        proceso = db.query(models.Proceso).filter(models.Proceso.id == proceso_id).first()
+        if not proceso:
+            return jsonify({"detail": "Proceso no encontrado."}), 404
+
+        # Validar duplicados si cambia de nombre
+        if func.lower(proceso.nombre) != func.lower(nuevo_nombre):
+            existente = db.query(models.Proceso).filter(
+                func.lower(models.Proceso.nombre) == func.lower(nuevo_nombre)
+            ).first()
+            if existente:
+                return jsonify({"detail": f"El proceso '{nuevo_nombre}' ya existe."}), 400
+
+        antiguo_nombre = proceso.nombre
+        proceso.nombre = nuevo_nombre
+
+        # Actualizar en cascada en las tablas que guardan el nombre como string
+        try:
+            # 1. Usuarios
+            db.query(models.Usuario).filter(models.Usuario.rol == antiguo_nombre).update(
+                {models.Usuario.rol: nuevo_nombre}, synchronize_session=False
+            )
+            # 2. Tarifas referencia
+            db.query(models.TarifaReferencia).filter(models.TarifaReferencia.rol == antiguo_nombre).update(
+                {models.TarifaReferencia.rol: nuevo_nombre}, synchronize_session=False
+            )
+            # 3. Precios labor
+            db.query(models.PrecioLabor).filter(models.PrecioLabor.rol == antiguo_nombre).update(
+                {models.PrecioLabor.rol: nuevo_nombre}, synchronize_session=False
+            )
+            # 4. Produccion
+            db.query(models.Produccion).filter(models.Produccion.proceso_realizado == antiguo_nombre).update(
+                {models.Produccion.proceso_realizado: nuevo_nombre}, synchronize_session=False
+            )
+
+            db.commit()
+            return jsonify({"mensaje": f"Proceso '{antiguo_nombre}' renombrado a '{nuevo_nombre}' y registros actualizados."}), 200
+        except Exception as e:
+            db.rollback()
+            return jsonify({"detail": f"Error al actualizar registros vinculados: {str(e)}"}), 500
+
+@app.route("/api/v1/procesos/<int:proceso_id>", methods=["DELETE"])
+def eliminar_proceso(proceso_id):
+    with next(get_db()) as db:
+        proceso = db.query(models.Proceso).filter(models.Proceso.id == proceso_id).first()
+        if not proceso:
+            return jsonify({"detail": "Proceso no encontrado."}), 404
+
+        nombre_proceso = proceso.nombre
+
+        # Restricciones de eliminación
+        if db.query(models.Usuario).filter(models.Usuario.rol == nombre_proceso).first():
+            return jsonify({"detail": f"No se puede eliminar porque el rol '{nombre_proceso}' está asignado a uno o más operarios."}), 400
+        if db.query(models.TarifaReferencia).filter(models.TarifaReferencia.rol == nombre_proceso).first():
+            return jsonify({"detail": f"No se puede eliminar porque el proceso '{nombre_proceso}' tiene tarifas específicas por referencia configuradas."}), 400
+        if db.query(models.PrecioLabor).filter(models.PrecioLabor.rol == nombre_proceso).first():
+            return jsonify({"detail": f"No se puede eliminar porque el proceso '{nombre_proceso}' tiene una tarifa global configurada."}), 400
+        if db.query(models.Produccion).filter(models.Produccion.proceso_realizado == nombre_proceso).first():
+            return jsonify({"detail": f"No se puede eliminar porque el proceso '{nombre_proceso}' ya tiene registros de producción guardados."}), 400
+
+        try:
+            db.delete(proceso)
+            db.commit()
+            return jsonify({"mensaje": f"Proceso '{nombre_proceso}' eliminado correctamente."}), 200
+        except Exception as e:
+            db.rollback()
+            return jsonify({"detail": f"Error al eliminar el proceso: {str(e)}"}), 500
+
+
+@app.route("/api/v1/procesos/reordenar", methods=["POST"])
+def reordenar_procesos():
+    """Recibe lista de IDs en el nuevo orden y reasigna el campo 'orden'."""
+    datos = request.json
+    ids_ordenados = datos.get("ids", [])
+    if not ids_ordenados:
+        return jsonify({"detail": "Se requiere la lista de IDs."}), 400
+    with next(get_db()) as db:
+        for posicion, proceso_id in enumerate(ids_ordenados, start=1):
+            db.query(models.Proceso).filter(models.Proceso.id == proceso_id).update(
+                {models.Proceso.orden: posicion}, synchronize_session=False
+            )
+        db.commit()
+        return jsonify({"mensaje": "Orden actualizado correctamente."})
+
+
+# ── Guía de Producción ───────────────────────────────────────────────────────
+@app.route("/api/v1/guia-produccion", methods=["GET"])
+def guia_produccion():
+    """Devuelve tabla de seguimiento: cada orden con el estado de cada proceso."""
+    filtro = request.args.get("estado", "activas")  # activas | completadas | todas
+    with next(get_db()) as db:
+        # Obtener todos los procesos ordenados
+        procesos = db.query(models.Proceso).order_by(models.Proceso.orden.asc()).all()
+        nombres_procesos = [p.nombre for p in procesos]
+
+        # Obtener órdenes según filtro
+        query = db.query(models.Orden)
+        if filtro == "activas":
+            query = query.filter(models.Orden.estado.notin_(["COMPLETADA", "CANCELLED"]))
+        elif filtro == "completadas":
+            query = query.filter(models.Orden.estado == "COMPLETADA")
+        ordenes = query.order_by(models.Orden.fecha_creacion.desc()).all()
+
+        resultado = []
+        for orden in ordenes:
+            # Obtener todos los registros de producción de esta orden
+            producciones = db.query(models.Produccion).join(models.Lote).filter(
+                models.Lote.id_orden == orden.id
+            ).all()
+
+            procesos_completados = {p.proceso_realizado for p in producciones}
+            fila = {
+                "orden_id": orden.id,
+                "referencia": orden.referencia,
+                "color": orden.color,
+                "cliente": orden.cliente or "",
+                "total_pares": orden.total_pares,
+                "estado": orden.estado,
+                "fecha_creacion": orden.fecha_creacion.isoformat(),
+                "fecha_completado": orden.fecha_completado.isoformat() if orden.fecha_completado else None,
+                "procesos": {
+                    nombre: (nombre in procesos_completados)
+                    for nombre in nombres_procesos
+                }
+            }
+            resultado.append(fila)
+
+        return jsonify({
+            "columnas": nombres_procesos,
+            "filas": resultado
+        })
 
 # ── Gestión de Tarifas por Referencia ───────────────────────────────────────
 @app.route("/api/v1/tarifas/referencia", methods=["GET"])
@@ -916,6 +1223,9 @@ def registrar_adelanto():
 
         nuevo_adelanto = models.Adelanto(id_operario=operario.id, monto=monto_float, observacion=observacion)
         db.add(nuevo_adelanto)
+        registrar_bitacora(db, "AVANCE", "REGISTRAR",
+            f"Avance de ${monto_float:,.0f} registrado a {operario.nombre}. Obs: {observacion or 'Sin observaci\u00f3n'}"
+        )
         db.commit()
         return jsonify({"mensaje": f"Adelanto de ${monto_float:,.0f} registrado a {operario.nombre}."}), 201
 
@@ -928,6 +1238,30 @@ def eliminar_adelanto(adelanto_id):
         db.delete(adelanto)
         db.commit()
         return jsonify({"mensaje": "Adelanto eliminado correctamente."})
+
+
+# ── Bitácora del Sistema ─────────────────────────────────────────────────────
+@app.route("/api/v1/bitacora", methods=["GET"])
+def listar_bitacora():
+    with next(get_db()) as db:
+        limit = int(request.args.get("limit", 200))
+        tipo = request.args.get("tipo")  # Filtro opcional por tipo
+        query = db.query(models.Bitacora)
+        if tipo:
+            query = query.filter(models.Bitacora.tipo == tipo.upper())
+        entradas = query.order_by(models.Bitacora.fecha.desc()).limit(limit).all()
+        return jsonify([
+            {
+                "id": e.id,
+                "tipo": e.tipo,
+                "accion": e.accion,
+                "descripcion": e.descripcion,
+                "detalle": e.detalle,
+                "fecha": e.fecha.isoformat()
+            }
+            for e in entradas
+        ])
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

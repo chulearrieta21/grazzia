@@ -59,30 +59,24 @@ function ImprimirOrdenesContent() {
   }
 
   const getOrderRange = (sizesString: string) => {
-    let isNino = false
+    // Determinar el rango real de tallas con cantidad > 0
+    const tallasConCantidad: number[] = []
     if (sizesString) {
       const pairs = sizesString.replace(/,/g, ' ').split(/\s+/)
       pairs.forEach(p => {
         const parts = p.split(/[:=]/)
         if (parts.length === 2) {
           const szNum = parseInt(parts[0])
-          if (!isNaN(szNum) && szNum <= 33 && parseInt(parts[1]) > 0) {
-            isNino = true
+          const qty = parseInt(parts[1])
+          if (!isNaN(szNum) && qty > 0) {
+            tallasConCantidad.push(szNum)
           }
         }
       })
     }
-    
-    if (isNino) {
-      return {
-        type: 'nino',
-        sizes: ['21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33'],
-        widths: ['16%', '8%', '10%', '5%', '9%', ...Array(13).fill('2.3%'), '8%', '14%'],
-        titleColSpan: 13,
-        emptyCellsProcHeader: 9,
-        emptyCellsProcData: 16
-      }
-    } else {
+
+    // Si no hay tallas con cantidad, usar rango adulto por defecto
+    if (tallasConCantidad.length === 0) {
       return {
         type: 'adulto',
         sizes: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43'],
@@ -91,6 +85,29 @@ function ImprimirOrdenesContent() {
         emptyCellsProcHeader: 6,
         emptyCellsProcData: 13
       }
+    }
+
+    const minTalla = Math.min(...tallasConCantidad)
+    const maxTalla = Math.max(...tallasConCantidad)
+
+    // Generar todas las tallas entre min y max (inclusive)
+    const sizes: string[] = []
+    for (let t = minTalla; t <= maxTalla; t++) {
+      sizes.push(t.toString())
+    }
+
+    const n = sizes.length
+    // Distribuir el ancho disponible (~48%) entre las tallas
+    const pct = Math.max(1.8, Math.floor(480 / n) / 10)
+    const tallasWidth = sizes.map(() => `${pct}%`)
+
+    return {
+      type: 'dinamico',
+      sizes,
+      widths: ['16%', '8%', '10%', '5%', '9%', ...tallasWidth, '8%', '14%'],
+      titleColSpan: n,
+      emptyCellsProcHeader: Math.max(0, n - 4),
+      emptyCellsProcData: Math.max(0, n + 7)
     }
   }
 

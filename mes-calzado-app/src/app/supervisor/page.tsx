@@ -24,6 +24,8 @@ interface JornadaResumen {
   estado: string
   eventos: string
 }
+interface Proceso { id: number; nombre: string }
+interface BitacoraEntry { id: number; tipo: string; accion: string; descripcion: string; detalle: string | null; fecha: string }
 
 // ── Alerts ───────────────────────────────────────────────────────────────────
 function Alert({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
@@ -47,7 +49,7 @@ for (let i = 21; i <= 43; i++) {
 }
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
-const TABS = ['Órdenes', 'Operarios', 'Tarifas', 'Producción', 'Asistencia', 'Nómina', 'Avances'] as const
+const TABS = ['Órdenes', 'Operarios', 'Procesos', 'Tarifas', 'Producción', 'Guía de Producción', 'Asistencia', 'Nómina', 'Avances', 'Historial'] as const
 type Tab = typeof TABS[number]
 
 const getCurrMonthStr = () => {
@@ -71,6 +73,13 @@ export default function SupervisorDashboard() {
   const [tarifasRef, setTarifasRef] = useState<TarifaRef[]>([])
   const [referencias, setReferencias] = useState<string[]>([])
   const [jornadas, setJornadas] = useState<JornadaResumen[]>([])
+  const [procesos, setProcesos] = useState<Proceso[]>([])
+  const [bitacora, setBitacora] = useState<BitacoraEntry[]>([])
+  const [bitacoraFiltroTipo, setBitacoraFiltroTipo] = useState('')
+  const [guia, setGuia] = useState<{ columnas: string[]; filas: any[] }>({ columnas: [], filas: [] })
+  const [guiaFiltroEstado, setGuiaFiltroEstado] = useState<'activas' | 'completadas' | 'todas'>('activas')
+  const [dragProcesoIdx, setDragProcesoIdx] = useState<number | null>(null)
+  const [dragOverProcesoIdx, setDragOverProcesoIdx] = useState<number | null>(null)
   // Asistencia Filters
   const [asistenciaFilterType, setAsistenciaFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'año'>('todos')
   const [asistenciaFilterDia, setAsistenciaFilterDia] = useState(() => {
@@ -146,18 +155,24 @@ export default function SupervisorDashboard() {
   const totalQuantity = Object.values(sizeMap).reduce((acc, val) => acc + (parseInt(val) || 0), 0).toString()
 
   // Operario form
-  const ROLES_PERMITIDOS = ['Picado', 'Guarnizado', 'Recamado', 'Montado', 'Pegado', 'Detallado', 'Despachado', 'Independiente']
+  const ROLES_PERMITIDOS = procesos.map(p => p.nombre)
   const [opNombre, setOpNombre] = useState('')
-  const [opRol, setOpRol] = useState(ROLES_PERMITIDOS[0])
+  const [opRol, setOpRol] = useState('')
   const [opTipoPago, setOpTipoPago] = useState<'por_produccion' | 'por_dia'>('por_produccion')
   const [opSalarioDia, setOpSalarioDia] = useState('')
   const [opPrecioPar, setOpPrecioPar] = useState('')
+  const [isEditingOperario, setIsEditingOperario] = useState(false)
+  const [editOperarioId, setEditOperarioId] = useState<number | null>(null)
+  // Procesos form
+  const [procesoNombre, setProcesoNombre] = useState('')
+  const [isEditingProceso, setIsEditingProceso] = useState(false)
+  const [editProcesoId, setEditProcesoId] = useState<number | null>(null)
 
   // Tarifa por referencia form
   const [tRef, setTRef] = useState('')
   const [tPreciosRol, setTPreciosRol] = useState<{[key: string]: string}>({})
   // Tarifa global form
-  const [tGRol, setTGRol] = useState(ROLES_PERMITIDOS[0])
+  const [tGRol, setTGRol] = useState('')
   const [tGPrecio, setTGPrecio] = useState('')
   // Adelantos
   const [adelantos, setAdelantos] = useState<any[]>([])
@@ -172,7 +187,7 @@ export default function SupervisorDashboard() {
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchAll = () => {
-    fetchOrders(); fetchMovements(); fetchPayroll(selectedMonth); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos()
+    fetchOrders(); fetchMovements(); fetchPayroll(selectedMonth); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos(); fetchProcesos(); fetchBitacora(); fetchGuia(guiaFiltroEstado)
   }
 
   const fetchOrders = async () => {
@@ -211,6 +226,35 @@ export default function SupervisorDashboard() {
   const fetchAdelantos = async () => {
     try { const r = await fetch(`${API}/adelantos`); setAdelantos(await r.json()) }
     catch { }
+  }
+  const fetchProcesos = async () => {
+    try { const r = await fetch(`${API}/procesos`); setProcesos(await r.json()) }
+    catch { }
+  }
+  const fetchBitacora = async () => {
+    try { const r = await fetch(`${API}/bitacora?limit=300`); setBitacora(await r.json()) }
+    catch { }
+  }
+  const fetchGuia = async (estado: string = 'activas') => {
+    try { const r = await fetch(`${API}/guia-produccion?estado=${estado}`); setGuia(await r.json()) }
+    catch { }
+  }
+
+  const handleMoverProceso = async (index: number, direccion: 'up' | 'down') => {
+    const nuevos = [...procesos]
+    const swapIdx = direccion === 'up' ? index - 1 : index + 1
+    if (swapIdx < 0 || swapIdx >= nuevos.length) return
+    ;[nuevos[index], nuevos[swapIdx]] = [nuevos[swapIdx], nuevos[index]]
+    const ids = nuevos.map(p => p.id)
+    try {
+      const r = await fetch(`${API}/procesos/reordenar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail, 'error'); return }
+      fetchProcesos(); fetchGuia(guiaFiltroEstado)
+    } catch { showAlert('Error al reordenar los procesos.', 'error') }
   }
 
   const getISOWeekAndYear = (dateStr: string) => {
@@ -450,17 +494,61 @@ export default function SupervisorDashboard() {
     try {
       const body: any = { nombre: opNombre, rol: opRol, tipo_pago: opTipoPago }
       if (opTipoPago === 'por_dia') body.salario_dia = parseFloat(opSalarioDia)
-      if (opTipoPago === 'por_produccion') body.precio_por_par = parseFloat(opPrecioPar)
+      if (opTipoPago === 'por_produccion' && opPrecioPar.trim() !== '') body.precio_por_par = parseFloat(opPrecioPar)
 
-      const r = await fetch(`${API}/operarios`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      const url = isEditingOperario ? `${API}/operarios/${editOperarioId}` : `${API}/operarios`
+      const method = isEditingOperario ? 'PUT' : 'POST'
+
+      const r = await fetch(url, {
+        method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       })
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
       showAlert(d.mensaje, 'success')
-      setOpNombre(''); setOpRol(ROLES_PERMITIDOS[0]); setOpSalarioDia(''); setOpPrecioPar('')
+      cancelEditOperario()
       fetchOperarios(); fetchTarifas()
-    } catch { showAlert('Error al crear operario.', 'error') }
+    } catch { showAlert(isEditingOperario ? 'Error al actualizar operario.' : 'Error al crear operario.', 'error') }
+  }
+
+  const handleEditOperarioClick = (o: Operario) => {
+    setIsEditingOperario(true)
+    setEditOperarioId(o.id)
+    setOpNombre(o.nombre)
+    setOpRol(o.rol)
+    setOpTipoPago(o.tipo_pago)
+    setOpSalarioDia(o.salario_dia !== null ? String(o.salario_dia) : '')
+    setOpPrecioPar(o.precio_por_par !== null ? String(o.precio_por_par) : '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEditOperario = () => {
+    setIsEditingOperario(false)
+    setEditOperarioId(null)
+    setOpNombre('')
+    setOpRol('')
+    setOpTipoPago('por_produccion')
+    setOpSalarioDia('')
+    setOpPrecioPar('')
+  }
+
+  const handleEditTarifaRefGroup = (ref: string, items: TarifaRef[]) => {
+    setTRef(ref)
+    const precios: {[key: string]: string} = {}
+    
+    precios['GLOBAL'] = ''
+    ROLES_PERMITIDOS.forEach(rol => {
+      precios[rol] = ''
+    })
+    
+    items.forEach(t => {
+      precios[t.rol] = String(t.precio_por_par)
+    })
+    setTPreciosRol(precios)
+    
+    const formEl = document.querySelector('form[onSubmit*="handleGuardarTarifaRef"]')
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   }
 
   const handleEliminarOperario = async (id: number, nombre: string) => {
@@ -624,7 +712,7 @@ export default function SupervisorDashboard() {
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
       showAlert(d.mensaje, 'success')
-      setTGRol(ROLES_PERMITIDOS[0]); setTGPrecio('')
+      setTGRol(''); setTGPrecio('')
       fetchTarifas()
     } catch { showAlert('Error al guardar tarifa global.', 'error') }
   }
@@ -638,6 +726,48 @@ export default function SupervisorDashboard() {
       showAlert(d.mensaje, 'success')
       fetchTarifas()
     } catch { showAlert('Error al eliminar tarifa.', 'error') }
+  }
+
+  // ── Handlers: Procesos ─────────────────────────────────────────────────────
+  const handleGuardarProceso = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!procesoNombre.trim()) { showAlert('El nombre del proceso es obligatorio.', 'error'); return }
+    try {
+      const url = isEditingProceso ? `${API}/procesos/${editProcesoId}` : `${API}/procesos`
+      const method = isEditingProceso ? 'PUT' : 'POST'
+      const r = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: procesoNombre })
+      })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail, 'error'); return }
+      showAlert(d.mensaje, 'success')
+      setProcesoNombre(''); setIsEditingProceso(false); setEditProcesoId(null)
+      fetchProcesos()
+    } catch { showAlert('Error al guardar el proceso.', 'error') }
+  }
+
+  const handleEditProcesoClick = (p: Proceso) => {
+    setIsEditingProceso(true)
+    setEditProcesoId(p.id)
+    setProcesoNombre(p.nombre)
+  }
+
+  const cancelEditProceso = () => {
+    setIsEditingProceso(false)
+    setEditProcesoId(null)
+    setProcesoNombre('')
+  }
+
+  const handleEliminarProceso = async (id: number, nombre: string) => {
+    if (!confirm(`¿Eliminar el proceso "${nombre}"?\nSolo se puede eliminar si no está asignado a ningún operario, tarifa o registro de producción.`)) return
+    try {
+      const r = await fetch(`${API}/procesos/${id}`, { method: 'DELETE' })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail, 'error'); return }
+      showAlert(d.mensaje, 'success')
+      fetchProcesos()
+    } catch { showAlert('Error al eliminar el proceso.', 'error') }
   }
 
   const handleGuardarAdelanto = async (e: React.FormEvent) => {
@@ -858,19 +988,21 @@ export default function SupervisorDashboard() {
                         <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{o.id}</td>
                         <td>{o.reference} - {o.color}</td>
                         <td style={{ fontFamily: 'monospace' }}>{o.totalQuantity}</td>
-                        <td style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEditOrder(o)} className="action-btn action-btn-edit">
-                            ✏️ Editar
-                          </button>
-                          <button onClick={() => setSelectedOrder(o)} className="action-btn action-btn-codes">
-                            🏷️ Códigos
-                          </button>
-                          <button onClick={() => window.open(`/imprimir?ids=${o.id}`, '_blank')} className="action-btn action-btn-pdf">
-                            📄 PDF
-                          </button>
-                          <button onClick={() => handleDeleteOrder(o.id)} className="action-btn action-btn-delete">
-                            🗑️ Eliminar
-                          </button>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button onClick={() => handleEditOrder(o)} className="action-btn action-btn-edit">
+                              ✏️ Editar
+                            </button>
+                            <button onClick={() => setSelectedOrder(o)} className="action-btn action-btn-codes">
+                              🏷️ Códigos
+                            </button>
+                            <button onClick={() => window.open(`/imprimir?ids=${o.id}`, '_blank')} className="action-btn action-btn-pdf">
+                              📄 PDF
+                            </button>
+                            <button onClick={() => handleDeleteOrder(o.id)} className="action-btn action-btn-delete">
+                              🗑️ Eliminar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -887,7 +1019,7 @@ export default function SupervisorDashboard() {
         <div className="grid-layout">
           {/* Formulario */}
           <div className="glass-card">
-            <h2>➕ Agregar Operario</h2>
+            <h2>{isEditingOperario ? '✏️ Editar Operario' : '➕ Agregar Operario'}</h2>
             <form onSubmit={handleCrearOperario}>
               <label className="modern-label">Nombre completo
                 <input className="modern-input" value={opNombre} onChange={e => setOpNombre(e.target.value)} required placeholder="Ej. Luis Martínez" />
@@ -905,9 +1037,9 @@ export default function SupervisorDashboard() {
               </label>
 
               {opTipoPago === 'por_produccion' && (
-                <label className="modern-label">Precio por par ($)
+                <label className="modern-label">Precio por par ($) · Opcional
                   <input type="number" className="modern-input" value={opPrecioPar} onChange={e => setOpPrecioPar(e.target.value)}
-                    required placeholder="Ej. 1500" min={0} />
+                    placeholder="Opcional (Ej. 1500)" min={0} />
                 </label>
               )}
               {opTipoPago === 'por_dia' && (
@@ -917,7 +1049,12 @@ export default function SupervisorDashboard() {
                 </label>
               )}
 
-              <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>Guardar Operario</button>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>{isEditingOperario ? 'Guardar Cambios' : 'Guardar Operario'}</button>
+                {isEditingOperario && (
+                  <button type="button" className="btn-primary" style={{ background: '#ef4444', flex: 1 }} onClick={cancelEditOperario}>Cancelar</button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -1001,14 +1138,150 @@ export default function SupervisorDashboard() {
                           : `$${(o.salario_dia ?? 0).toLocaleString()}/día`}
                       </td>
                       <td>
-                        <button onClick={() => handleEliminarOperario(o.id, o.nombre)} className="action-btn action-btn-delete">
-                          🗑️ Eliminar
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button onClick={() => handleEditOperarioClick(o)} className="action-btn action-btn-edit" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}>
+                            ✏️ Editar
+                          </button>
+                          <button onClick={() => handleEliminarOperario(o.id, o.nombre)} className="action-btn action-btn-delete">
+                            🗑️ Eliminar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Procesos ── */}
+      {tab === 'Procesos' && (
+        <div className="grid-layout">
+          {/* Formulario */}
+          <div className="glass-card">
+            <h2>{isEditingProceso ? '✏️ Editar Proceso' : '➕ Agregar Proceso'}</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+              Los procesos son las etapas del flujo de producción. Puedes crear nuevos roles, editarlos o eliminarlos si no están en uso.
+            </p>
+            <form onSubmit={handleGuardarProceso}>
+              <label className="modern-label">Nombre del Proceso / Rol
+                <input
+                  className="modern-input"
+                  value={procesoNombre}
+                  onChange={e => setProcesoNombre(e.target.value)}
+                  required
+                  placeholder="Ej. Cortado, Pintado, etc."
+                />
+              </label>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                  {isEditingProceso ? '💾 Guardar Cambios' : '➕ Crear Proceso'}
+                </button>
+                {isEditingProceso && (
+                  <button type="button" className="btn-primary" style={{ background: '#ef4444', flex: 1 }} onClick={cancelEditProceso}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Lista de procesos con drag & drop */}
+          <div>
+            <h2>Procesos Registrados</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: '1rem' }}>
+              🔄 Arrastra el icono <strong style={{ color: 'white' }}>⠿</strong> para reordenar los procesos. El orden aquí define la secuencia obligatoria de producción.
+            </p>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="modern-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}></th>
+                    <th style={{ width: '50px' }}>#</th>
+                    <th>Nombre del Proceso</th>
+                    <th style={{ width: '180px' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {procesos.length === 0 && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin procesos registrados.</td></tr>
+                  )}
+                  {procesos.map((p, idx) => (
+                    <tr
+                      key={p.id}
+                      draggable
+                      onDragStart={() => setDragProcesoIdx(idx)}
+                      onDragOver={e => { e.preventDefault(); setDragOverProcesoIdx(idx) }}
+                      onDragLeave={() => setDragOverProcesoIdx(null)}
+                      onDrop={async () => {
+                        if (dragProcesoIdx === null || dragProcesoIdx === idx) {
+                          setDragProcesoIdx(null); setDragOverProcesoIdx(null); return
+                        }
+                        const nuevos = [...procesos]
+                        const [movido] = nuevos.splice(dragProcesoIdx, 1)
+                        nuevos.splice(idx, 0, movido)
+                        const ids = nuevos.map(p => p.id)
+                        setDragProcesoIdx(null); setDragOverProcesoIdx(null)
+                        try {
+                          const r = await fetch(`${API}/procesos/reordenar`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids })
+                          })
+                          const d = await r.json()
+                          if (!r.ok) { showAlert(d.detail, 'error'); return }
+                          fetchProcesos(); fetchGuia(guiaFiltroEstado)
+                        } catch { showAlert('Error al reordenar.', 'error') }
+                      }}
+                      onDragEnd={() => { setDragProcesoIdx(null); setDragOverProcesoIdx(null) }}
+                      style={{
+                        transition: 'all 0.15s ease',
+                        background: dragOverProcesoIdx === idx && dragProcesoIdx !== idx
+                          ? 'rgba(59,130,246,0.15)'
+                          : dragProcesoIdx === idx
+                          ? 'rgba(255,255,255,0.04)'
+                          : undefined,
+                        borderTop: dragOverProcesoIdx === idx && dragProcesoIdx !== idx && dragProcesoIdx !== null && dragProcesoIdx > idx
+                          ? '2px solid #3b82f6'
+                          : undefined,
+                        borderBottom: dragOverProcesoIdx === idx && dragProcesoIdx !== idx && dragProcesoIdx !== null && dragProcesoIdx < idx
+                          ? '2px solid #3b82f6'
+                          : undefined,
+                        opacity: dragProcesoIdx === idx ? 0.45 : 1,
+                      }}
+                    >
+                      <td style={{ textAlign: 'center', cursor: 'grab', color: 'rgba(255,255,255,0.35)', fontSize: '1.1rem', userSelect: 'none' }} title="Arrastrar para reordenar">
+                        ⠿
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: 600, color: 'white' }}>{p.nombre}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleEditProcesoClick(p)}
+                            className="action-btn action-btn-edit"
+                            style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => handleEliminarProceso(p.id, p.nombre)}
+                            className="action-btn action-btn-delete"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245,158,11,0.07)', borderRadius: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <p style={{ color: 'var(--accent-yellow)', fontSize: '0.88rem', margin: 0 }}>
+                ⚠️ <strong>Restricciones:</strong> No puedes eliminar un proceso que esté asignado a operarios, con tarifas configuradas, o con registros de producción históricos. Debes reasignar o limpiar primero esos datos.
+              </p>
             </div>
           </div>
         </div>
@@ -1082,6 +1355,17 @@ export default function SupervisorDashboard() {
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '20px' }}>
                         {tarifas.length} proceso{tarifas.length !== 1 ? 's' : ''}
                       </div>
+                      <button onClick={() => handleEditTarifaRefGroup(ref, tarifas)}
+                        style={{
+                          background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa',
+                          padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                          transition: 'all 0.2s', fontFamily: 'var(--font-main)'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-blue)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59,130,246,0.15)'}
+                      >
+                        ✏️ Editar
+                      </button>
                     </div>
                     
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', flex: 1 }}>
@@ -1160,31 +1444,45 @@ export default function SupervisorDashboard() {
           <div className="glass-card" style={{ padding: '1.5rem' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">
-                <thead><tr><th>Hora</th><th>Operario</th><th>Orden</th><th>Proceso</th><th></th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Operario</th>
+                    <th>Orden</th>
+                    <th>Referencia</th>
+                    <th>Color</th>
+                    <th>Proceso</th>
+                    <th>Pares</th>
+                    <th>Valor</th>
+                    <th></th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {movements.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin movimientos registrados.</td></tr>}
+                  {movements.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin movimientos registrados.</td></tr>}
                   {movements.map((m: any) => {
-                    const dateObj = m.createdAt ? new Date(m.createdAt) : m.timestamp ? new Date(m.timestamp) : null;
+                    const dateObj = m.createdAt ? new Date(m.createdAt) : null
                     const dateFormatted = dateObj && !isNaN(dateObj.getTime())
-                      ? `${dateObj.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : '—';
-                    
+                      ? `${dateObj.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : '—'
                     return (
                       <tr key={m.id}>
-                        <td style={{ color: 'var(--text-secondary)' }}>
-                          {dateFormatted}
-                        </td>
+                        <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{dateFormatted}</td>
                         <td style={{ fontWeight: 600, color: 'var(--accent-blue)' }}>{m.user?.name || `ID: ${m.userId}`}</td>
-                        <td>
-                          {m.batch?.order?.reference ? `${m.batch.order.reference} - ${m.batch.order.color || ''}` : '—'} 
-                          <span className="badge badge-pending" style={{ marginLeft: '8px' }}>{m.batch?.id || m.batchId}</span>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          <span className="badge badge-pending">{m.orden || m.batch?.order?.id || m.batch?.id || '—'}</span>
                         </td>
-                        <td style={{ fontWeight: 'bold', color: '#34d399' }}>{m.process?.name}</td>
+                        <td style={{ fontWeight: 600, color: 'white' }}>{m.referencia || m.batch?.order?.reference || '—'}</td>
+                        <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{m.color || m.batch?.order?.color || '—'}</td>
+                        <td style={{ fontWeight: 'bold', color: '#34d399' }}>{m.proceso || m.process?.name || '—'}</td>
+                        <td style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>{m.pares ?? m.batch?.quantity ?? '—'}</td>
+                        <td style={{ color: 'var(--accent-green)', fontWeight: 700 }}>
+                          {m.valor != null ? `$${Number(m.valor).toLocaleString()}` : '—'}
+                        </td>
                         <td>
                           <button style={btnDanger} onClick={() => handleDeleteProduccion(m.id)}>×</button>
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
@@ -1192,6 +1490,138 @@ export default function SupervisorDashboard() {
           </div>
         </div>
       )}
+
+      {/* ── TAB: Guía de Producción ── */}
+      {tab === 'Guía de Producción' && (() => {
+        const handleExportGuiaExcel = () => {
+          if (!guia.filas.length) { showAlert('No hay datos para exportar.', 'error'); return }
+          const LABEL: Record<string, string> = { activas: 'En Progreso', completadas: 'Completadas', todas: 'Todas' }
+          const filas = guia.filas.map((f: any) => {
+            const row: Record<string, any> = {
+              'Orden': f.orden_id,
+              'Referencia': f.referencia,
+              'Color': f.color,
+              'Cliente': f.cliente,
+              'Pares': f.total_pares,
+              'Estado': f.estado,
+              'Fecha Creación': f.fecha_creacion ? new Date(f.fecha_creacion).toLocaleString('es-CO') : '',
+              'Fecha Completado': f.fecha_completado ? new Date(f.fecha_completado).toLocaleString('es-CO') : '',
+            }
+            guia.columnas.forEach(col => { row[col] = f.procesos?.[col] ? '✅' : '—' })
+            return row
+          })
+          const ws = XLSX.utils.json_to_sheet(filas)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, 'Guía')
+          XLSX.writeFile(wb, `guia_produccion_${guiaFiltroEstado}_${new Date().toISOString().slice(0,10)}.xlsx`)
+        }
+
+        return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2 style={{ margin: 0 }}>📋 Guía de Producción por Orden</h2>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <select
+                className="modern-input" style={{ width: 'auto', padding: '8px 12px' }}
+                value={guiaFiltroEstado}
+                onChange={e => {
+                  const v = e.target.value as 'activas' | 'completadas' | 'todas'
+                  setGuiaFiltroEstado(v); fetchGuia(v)
+                }}
+              >
+                <option value="activas">En progreso</option>
+                <option value="completadas">Completadas</option>
+                <option value="todas">Todas</option>
+              </select>
+              <button onClick={() => fetchGuia(guiaFiltroEstado)} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.9rem' }}>🔄</button>
+              <button
+                onClick={handleExportGuiaExcel}
+                className="btn-primary"
+                style={{ background: 'var(--accent-green)', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                📊 Excel
+              </button>
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="modern-table" style={{ minWidth: '800px' }}>
+              <thead>
+                <tr>
+                  <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: '80px' }}>Orden</th>
+                  <th style={{ minWidth: '90px' }}>Referencia</th>
+                  <th style={{ minWidth: '80px' }}>Color</th>
+                  <th style={{ minWidth: '60px' }}>Pares</th>
+                  {guia.columnas.map(col => (
+                    <th key={col} style={{ minWidth: '90px', textAlign: 'center', fontSize: '0.78rem', whiteSpace: 'nowrap', padding: '10px 8px' }}>{col}</th>
+                  ))}
+                  <th style={{ minWidth: '120px', textAlign: 'center' }}>Completada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {guia.filas.length === 0 && (
+                  <tr><td colSpan={5 + guia.columnas.length} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Sin órdenes para mostrar.</td></tr>
+                )}
+                {guia.filas.map((fila: any) => {
+                  const totalProcesos = guia.columnas.length
+                  const completados = guia.columnas.filter(c => fila.procesos?.[c]).length
+                  const porcentaje = totalProcesos > 0 ? Math.round((completados / totalProcesos) * 100) : 0
+                  return (
+                    <tr key={fila.orden_id}>
+                      <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                        {fila.orden_id}
+                      </td>
+                      <td style={{ fontWeight: 600, color: 'white' }}>{fila.referencia}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{fila.color}</td>
+                      <td style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>{fila.total_pares}</td>
+                      {guia.columnas.map(col => (
+                        <td key={col} style={{ textAlign: 'center' }}>
+                          {fila.procesos?.[col]
+                            ? <span style={{ fontSize: '1.3rem' }} title={col}>✅</span>
+                            : <span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.15)' }}>—</span>
+                          }
+                        </td>
+                      ))}
+                      <td style={{ textAlign: 'center' }}>
+                        {fila.fecha_completado ? (
+                          <div>
+                            <div style={{ color: 'var(--accent-green)', fontWeight: 700, fontSize: '0.8rem' }}>
+                              ✅ {new Date(fila.fecha_completado).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                              {new Date(fila.fecha_completado).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)', fontWeight: 600 }}>{porcentaje}%</div>
+                            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '4px', height: '4px', marginTop: '4px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${porcentaje}%`, background: 'var(--accent-blue)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ padding: '8px 16px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.85rem', color: 'var(--accent-green)' }}>
+              ✅ = Proceso completado
+            </div>
+            <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              — = Pendiente
+            </div>
+            <div style={{ padding: '8px 16px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '0.85rem', color: 'var(--accent-blue)' }}>
+              Las columnas se actualizan automáticamente al agregar procesos desde la pestaña Procesos.
+            </div>
+          </div>
+        </div>
+        )
+      })()}
 
       {/* ── TAB: Asistencia ── */}
       {tab === 'Asistencia' && (
@@ -1385,23 +1815,43 @@ export default function SupervisorDashboard() {
           <div className="glass-card" style={{ padding: '1.5rem', borderColor: 'rgba(16,185,129,0.3)' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">
-                <thead><tr><th>Operario</th><th>Detalle Trabajo</th><th>Total Ganado</th><th>Avances</th><th>Neto a Pagar</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Operario</th>
+                    <th>Detalle por Referencia</th>
+                    <th>Total Pares</th>
+                    <th>Total Ganado</th>
+                    <th>Avances</th>
+                    <th>Neto a Pagar</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {payroll.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin datos de nómina.</td></tr>}
+                  {payroll.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin datos de nómina.</td></tr>}
                   {payroll.map((p: any) => (
                     <tr key={p.userId}>
-                      <td style={{ fontWeight: 600, color: 'white' }}>{p.name}</td>
-                      <td style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                        {p.totalPairs > 0 ? `${p.totalPairs} pares` : ''}
-                        {p.processesCount?.['Horas Trabajadas'] ? (p.totalPairs > 0 ? ` | ` : '') + `${p.processesCount['Horas Trabajadas']} horas` : ''}
+                      <td style={{ fontWeight: 600, color: 'white', verticalAlign: 'top' }}>{p.name}</td>
+                      <td style={{ fontSize: '0.85rem', verticalAlign: 'top' }}>
+                        {p.detalleReferencias && Object.entries(p.detalleReferencias).map(([ref, det]: [string, any]) => (
+                          <div key={ref} style={{ marginBottom: '6px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', borderLeft: '3px solid var(--accent-blue)' }}>
+                            <span style={{ color: 'white', fontWeight: 600 }}>{ref}</span>
+                            <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>{det.proceso}</span>
+                            <span style={{ color: 'var(--accent-yellow)', marginLeft: '8px' }}>{det.pares} pares</span>
+                            <span style={{ color: 'var(--accent-green)', marginLeft: '8px', fontWeight: 600 }}>= ${Number(det.valor).toLocaleString()}</span>
+                          </div>
+                        ))}
+                        {p.processesCount?.['Horas Trabajadas'] ? (
+                          <div style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', borderLeft: '3px solid var(--accent-yellow)' }}>
+                            <span style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>Jornales</span>
+                            <span style={{ color: 'var(--text-secondary)', marginLeft: '8px' }}>{p.processesCount['Horas Trabajadas']}h trabajadas</span>
+                          </div>
+                        ) : null}
                       </td>
-                      <td style={{ color: 'var(--text-secondary)' }}>
-                        ${(p.totalEarned || 0).toLocaleString()}
-                      </td>
-                      <td style={{ color: 'var(--accent-orange)' }}>
+                      <td style={{ color: 'var(--accent-yellow)', fontWeight: 700, verticalAlign: 'top' }}>{p.totalPairs > 0 ? p.totalPairs : '—'}</td>
+                      <td style={{ color: 'var(--text-secondary)', verticalAlign: 'top' }}>${(p.totalEarned || 0).toLocaleString()}</td>
+                      <td style={{ color: 'var(--accent-orange)', verticalAlign: 'top' }}>
                         {p.totalAdvances > 0 ? `-$${p.totalAdvances.toLocaleString()}` : '—'}
                       </td>
-                      <td style={{ color: 'var(--accent-green)', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                      <td style={{ color: 'var(--accent-green)', fontWeight: 'bold', fontSize: '1.2rem', verticalAlign: 'top' }}>
                         ${(p.netEarned || 0).toLocaleString()}
                       </td>
                     </tr>
@@ -1412,6 +1862,79 @@ export default function SupervisorDashboard() {
           </div>
         </div>
       )}
+
+      {/* ── TAB: Historial ── */}
+      {tab === 'Historial' && (() => {
+        const TIPO_COLORS: Record<string, string> = {
+          ORDEN: '#3b82f6',
+          PRODUCCION: '#10b981',
+          OPERARIO: '#8b5cf6',
+          TARIFA: '#f59e0b',
+          PROCESO: '#06b6d4',
+          AVANCE: '#ef4444',
+        }
+        const TIPO_ICONS: Record<string, string> = {
+          ORDEN: '📋', PRODUCCION: '🏭', OPERARIO: '👤', TARIFA: '💰', PROCESO: '⚙️', AVANCE: '💸'
+        }
+        const filteredBitacora = bitacoraFiltroTipo
+          ? bitacora.filter(e => e.tipo === bitacoraFiltroTipo)
+          : bitacora
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 style={{ margin: 0 }}>📋 Historial del Sistema</h2>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button onClick={fetchBitacora} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.9rem' }}>🔄 Actualizar</button>
+                <select className="modern-input" style={{ width: 'auto', padding: '8px 12px' }}
+                  value={bitacoraFiltroTipo} onChange={e => setBitacoraFiltroTipo(e.target.value)}>
+                  <option value="">Todos los eventos</option>
+                  {['ORDEN','PRODUCCION','OPERARIO','TARIFA','PROCESO','AVANCE'].map(t => (
+                    <option key={t} value={t}>{TIPO_ICONS[t]} {t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="glass-card" style={{ padding: '1.5rem' }}>
+              {filteredBitacora.length === 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Sin eventos registrados.</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '70vh', overflowY: 'auto', paddingRight: '8px' }} className="custom-scrollbar">
+                {filteredBitacora.map((e: BitacoraEntry) => {
+                  const fecha = new Date(e.fecha)
+                  const color = TIPO_COLORS[e.tipo] || '#6b7280'
+                  return (
+                    <div key={e.id} style={{
+                      display: 'flex', gap: '1rem', alignItems: 'flex-start',
+                      padding: '12px 16px', borderRadius: '10px',
+                      background: 'rgba(255,255,255,0.03)',
+                      borderLeft: `4px solid ${color}`,
+                    }}>
+                      <div style={{ fontSize: '1.3rem', lineHeight: 1, flexShrink: 0 }}>{TIPO_ICONS[e.tipo] || '🔧'}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '4px' }}>
+                          <span style={{ background: color, color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                            {e.tipo}
+                          </span>
+                          <span style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem' }}>
+                            {e.accion}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginLeft: 'auto' }}>
+                            {fecha.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })} {fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, color: 'white', fontSize: '0.9rem', lineHeight: 1.5 }}>{e.descripcion}</p>
+                        {e.detalle && (
+                          <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{e.detalle}</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* QR Modal */}
       {selectedOrder && (
