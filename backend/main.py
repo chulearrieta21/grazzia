@@ -200,27 +200,98 @@ def editar_orden(orden_id):
         precio_ref_raw = datos.get("precio_referencia")
         precio_ref = float(precio_ref_raw) if precio_ref_raw not in [None, ""] else None
 
-        orden.cliente = datos.get("client", orden.cliente)
-        orden.referencia = datos.get("reference", orden.referencia)
-        orden.color = datos.get("color", orden.color)
-        orden.suela = datos.get("sole", orden.suela)
-        orden.observaciones = datos.get("observations", orden.observaciones)
-        orden.precio_referencia = precio_ref
-        
-        if "totalQuantity" in datos:
-            nuevo_total = int(datos["totalQuantity"])
-            orden.total_pares = nuevo_total
-            orden.tallas = datos.get("sizes", orden.tallas)
+        nuevo_id = datos.get("id")
+        if nuevo_id:
+            nuevo_id = str(nuevo_id).strip()
 
-            lotes = db.query(models.Lote).filter(models.Lote.id_orden == orden_id).order_by(models.Lote.id).all()
-            if lotes:
-                for i, lote in enumerate(lotes):
-                    if i == 0:
-                        lote.cantidad = nuevo_total
-                    else:
-                        db.delete(lote)
+        if nuevo_id and nuevo_id != orden_id:
+            existe = db.query(models.Orden).filter(models.Orden.id == nuevo_id).first()
+            if existe:
+                return jsonify({"detail": f"El número de orden '{nuevo_id}' ya está en uso."}), 400
+
+            nueva_orden = models.Orden(
+                id=nuevo_id,
+                cliente=datos.get("client", orden.cliente),
+                referencia=datos.get("reference", orden.referencia),
+                color=datos.get("color", orden.color),
+                suela=datos.get("sole", orden.suela),
+                total_pares=orden.total_pares,
+                tallas=orden.tallas,
+                observaciones=datos.get("observations", orden.observaciones),
+                estado=orden.estado,
+                precio_referencia=precio_ref,
+                fecha_creacion=orden.fecha_creacion
+            )
+
+            if "totalQuantity" in datos:
+                nuevo_total = int(datos["totalQuantity"])
+                nueva_orden.total_pares = nuevo_total
+                nueva_orden.tallas = datos.get("sizes", orden.tallas)
+                
+                db.add(nueva_orden)
+                db.flush()
+
+                nuevo_lote_id = f"{nuevo_id}-B001"
+                nuevo_lote = models.Lote(
+                    id=nuevo_lote_id,
+                    id_orden=nuevo_id,
+                    cantidad=nuevo_total
+                )
+                db.add(nuevo_lote)
+                db.flush()
+
+                lotes_viejos = db.query(models.Lote).filter(models.Lote.id_orden == orden_id).order_by(models.Lote.id.asc()).all()
+                if lotes_viejos:
+                    db.query(models.Produccion).filter(models.Produccion.id_lote == lotes_viejos[0].id).update(
+                        {models.Produccion.id_lote: nuevo_lote_id},
+                        synchronize_session=False
+                    )
             else:
-                db.add(models.Lote(id=f"{orden.id}-B001", id_orden=orden.id, cantidad=nuevo_total))
+                db.add(nueva_orden)
+                db.flush()
+
+                lotes_viejos = db.query(models.Lote).filter(models.Lote.id_orden == orden_id).all()
+                for lote in lotes_viejos:
+                    lote_suffix = lote.id[len(orden_id):]
+                    nuevo_lote_id = f"{nuevo_id}{lote_suffix}"
+
+                    nuevo_lote = models.Lote(
+                        id=nuevo_lote_id,
+                        id_orden=nuevo_id,
+                        cantidad=lote.cantidad,
+                        fecha_creacion=lote.fecha_creacion
+                    )
+                    db.add(nuevo_lote)
+                    db.flush()
+
+                    db.query(models.Produccion).filter(models.Produccion.id_lote == lote.id).update(
+                        {models.Produccion.id_lote: nuevo_lote_id},
+                        synchronize_session=False
+                    )
+
+            db.delete(orden)
+        else:
+            orden.cliente = datos.get("client", orden.cliente)
+            orden.referencia = datos.get("reference", orden.referencia)
+            orden.color = datos.get("color", orden.color)
+            orden.suela = datos.get("sole", orden.suela)
+            orden.observaciones = datos.get("observations", orden.observaciones)
+            orden.precio_referencia = precio_ref
+
+            if "totalQuantity" in datos:
+                nuevo_total = int(datos["totalQuantity"])
+                orden.total_pares = nuevo_total
+                orden.tallas = datos.get("sizes", orden.tallas)
+
+                lotes = db.query(models.Lote).filter(models.Lote.id_orden == orden_id).order_by(models.Lote.id).all()
+                if lotes:
+                    for i, lote in enumerate(lotes):
+                        if i == 0:
+                            lote.cantidad = nuevo_total
+                        else:
+                            db.delete(lote)
+                else:
+                    db.add(models.Lote(id=f"{orden.id}-B001", id_orden=orden.id, cantidad=nuevo_total))
 
         db.commit()
         return jsonify({"mensaje": "Orden actualizada exitosamente"}), 200
@@ -257,9 +328,17 @@ def registrar_produccion():
 
         lote = db.query(models.Lote).filter(models.Lote.id == qr_orden).first()
         if not lote:
-            return jsonify({"detail": f"Lote/Canasta '{qr_orden}' no existe."}), 404
-            
-        orden = lote.orden
+            orden = db.query(models.Orden).filter(models.Orden.id == qr_orden).first()
+            if orden:
+                lote = db.query(models.Lote).filter(models.Lote.id_orden == orden.id).order_by(models.Lote.id.asc()).first()
+                if not lote:
+                    lote = models.Lote(id=f"{orden.id}-B001", id_orden=orden.id, cantidad=orden.total_pares)
+                    db.add(lote)
+                    db.flush()
+            else:
+                return jsonify({"detail": f"Lote/Canasta u Orden '{qr_orden}' no existe."}), 404
+        else:
+            orden = lote.orden
         
         # Si no se envía pares_reportados, se asume que se procesó el lote completo
         if pares_reportados is None:
@@ -267,6 +346,16 @@ def registrar_produccion():
             
         if pares_reportados > lote.cantidad:
             return jsonify({"detail": f"Fraude detectado: {pares_reportados} > {lote.cantidad} pares del lote."}), 400
+
+        # Verificar si otro operario diferente ya registró este mismo proceso/rol para esta orden
+        prod_otra = db.query(models.Produccion).join(models.Lote).filter(
+            models.Lote.id_orden == orden.id,
+            models.Produccion.proceso_realizado == operario.rol,
+            models.Produccion.id_operario != operario.id
+        ).first()
+        if prod_otra:
+            nombre_otro = prod_otra.operario.nombre if prod_otra.operario else f"ID: {prod_otra.id_operario}"
+            return jsonify({"detail": f"Conflicto de Rol: El proceso '{operario.rol}' en esta orden ya fue registrado por {nombre_otro}."}), 400
 
         if db.query(models.Produccion).filter(
             models.Produccion.id_lote == lote.id,
@@ -504,22 +593,42 @@ def crear_operario():
     if not nombre or not rol:
         return jsonify({"detail": "Nombre y rol son obligatorios."}), 400
 
-    with next(get_db()) as db:
-        max_id_user = db.query(models.Usuario).order_by(models.Usuario.id.desc()).first()
-        next_id = (max_id_user.id + 1) if max_id_user else 1
-        codigo_generado = f"EMP-{next_id:03d}"
+    try:
+        precio_individual = float(precio_par) if tipo_pago == "por_produccion" and precio_par is not None and precio_par != "" else None
+    except (ValueError, TypeError):
+        return jsonify({"detail": "El precio por par debe ser un número válido."}), 400
 
-        while db.query(models.Usuario).filter(models.Usuario.codigo_qr == codigo_generado).first():
-            next_id += 1
+    try:
+        salario_diario = float(salario_dia) if tipo_pago == "por_dia" and salario_dia is not None and salario_dia != "" else None
+    except (ValueError, TypeError):
+        return jsonify({"detail": "El salario por día debe ser un número válido."}), 400
+
+    try:
+        with next(get_db()) as db:
+            max_id_user = db.query(models.Usuario).order_by(models.Usuario.id.desc()).first()
+            next_id = (max_id_user.id + 1) if max_id_user else 1
             codigo_generado = f"EMP-{next_id:03d}"
 
-        precio_individual = float(precio_par) if tipo_pago == "por_produccion" and precio_par is not None else None
+            while db.query(models.Usuario).filter(models.Usuario.codigo_qr == codigo_generado).first():
+                next_id += 1
+                codigo_generado = f"EMP-{next_id:03d}"
 
-        nuevo = models.Usuario(nombre=nombre, rol=rol, codigo_qr=codigo_generado,
-                               tipo_pago=tipo_pago, salario_dia=salario_dia, precio_por_par=precio_individual, es_admin=False)
-        db.add(nuevo)
-        db.commit()
-        return jsonify({"mensaje": f"Operario '{nombre}' creado con código {codigo_generado}.", "id": nuevo.id}), 201
+            nuevo = models.Usuario(
+                nombre=nombre,
+                rol=rol,
+                codigo_qr=codigo_generado,
+                tipo_pago=tipo_pago,
+                salario_dia=salario_diario,
+                precio_por_par=precio_individual,
+                es_admin=False
+            )
+            db.add(nuevo)
+            db.commit()
+            return jsonify({"mensaje": f"Operario '{nombre}' creado con código {codigo_generado}.", "id": nuevo.id}), 201
+    except IntegrityError as ie:
+        return jsonify({"detail": f"Error de integridad en la base de datos: {str(ie.orig)}"}), 400
+    except Exception as e:
+        return jsonify({"detail": f"Error interno al crear el operario: {str(e)}"}), 500
 
 from sqlalchemy.exc import IntegrityError
 
@@ -738,6 +847,37 @@ def resumen_jornadas():
         
         resultado.sort(key=lambda x: x["fecha"], reverse=True)
         return jsonify(resultado)
+
+@app.route("/api/v1/jornadas", methods=["DELETE"])
+def eliminar_jornada():
+    operario_id = request.args.get("operario_id")
+    fecha_str = request.args.get("fecha")  # Esperado en formato YYYY-MM-DD
+    
+    if not operario_id or not fecha_str:
+        return jsonify({"detail": "Faltan parámetros obligatorios: operario_id y fecha."}), 400
+        
+    try:
+        operario_id = int(operario_id)
+        # Validar formato fecha
+        start_date = datetime.strptime(fecha_str, "%Y-%m-%d")
+        end_date = start_date + timedelta(days=1)
+    except ValueError:
+        return jsonify({"detail": "Parámetros inválidos. La fecha debe estar en formato YYYY-MM-DD."}), 400
+        
+    with next(get_db()) as db:
+        registros = db.query(models.RegistroJornada).filter(
+            models.RegistroJornada.id_operario == operario_id,
+            models.RegistroJornada.fecha >= start_date,
+            models.RegistroJornada.fecha < end_date
+        ).all()
+        
+        if not registros:
+            return jsonify({"detail": "No se encontraron registros de asistencia para ese operario en esa fecha."}), 404
+            
+        for r in registros:
+            db.delete(r)
+        db.commit()
+        return jsonify({"mensaje": f"Registros de asistencia eliminados para la fecha {fecha_str}."})
 
 # ── Adelantos (Préstamos) ────────────────────────────────────────────────────
 @app.route("/api/v1/adelantos", methods=["GET"])

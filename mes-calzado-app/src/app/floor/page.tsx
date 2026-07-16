@@ -4,23 +4,66 @@ import { useState, useRef, useEffect } from 'react'
 
 const API = 'https://grazzia-backend.onrender.com/api/v1'
 
+interface Operario {
+  id: number
+  nombre: string
+  rol: string
+  codigo_qr: string | null
+  tipo_pago: 'por_produccion' | 'por_dia'
+  salario_dia: number | null
+  precio_por_par: number | null
+}
+
 export default function FloorTerminal() {
   const [userQr, setUserQr] = useState('')
   const [batchId, setBatchId] = useState('')
-  const [operator, setOperator] = useState<any>(null)
+  const [operator, setOperator] = useState<Operario | null>(null)
   
   const [message, setMessage] = useState({ type: '', text: '' })
   const [loading, setLoading] = useState(false)
 
   const userQrRef = useRef<HTMLInputElement>(null)
   const batchIdRef = useRef<HTMLInputElement>(null)
+  const userQrTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const batchIdTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Focus initially
+  // Keep focus on active input
   useEffect(() => {
-    userQrRef.current?.focus()
-  }, [])
+    const focusActiveInput = () => {
+      if (operator) {
+        batchIdRef.current?.focus()
+      } else {
+        userQrRef.current?.focus()
+      }
+    }
+
+    focusActiveInput()
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName !== 'INPUT' && target.tagName !== 'BUTTON' && !target.closest('button')) {
+        focusActiveInput()
+      }
+    }
+
+    const handleGlobalBlur = () => {
+      setTimeout(() => {
+        if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'BUTTON') {
+          focusActiveInput()
+        }
+      }, 50)
+    }
+
+    document.addEventListener('click', handleGlobalClick)
+    window.addEventListener('blur', handleGlobalBlur)
+    return () => {
+      document.removeEventListener('click', handleGlobalClick)
+      window.removeEventListener('blur', handleGlobalBlur)
+    }
+  }, [operator])
 
   const procesarUserQr = async (qr: string) => {
+    if (userQrTimeoutRef.current) clearTimeout(userQrTimeoutRef.current)
     setLoading(true)
     setMessage({ type: '', text: '' })
     try {
@@ -35,27 +78,29 @@ export default function FloorTerminal() {
         setMessage({ type: 'error', text: data.detail || 'Error al validar operario' })
         setTimeout(() => setMessage(prev => prev.type === 'error' ? { type: '', text: '' } : prev), 4000)
         setUserQr('')
-        userQrRef.current?.focus()
+        setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
         if (data.tipo_pago === 'por_dia') {
           setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
           setUserQr('')
-          userQrRef.current?.focus()
+          setTimeout(() => userQrRef.current?.focus(), 50)
         } else if (data.tipo_pago === 'por_produccion') {
           setOperator(data.operario)
           setMessage({ type: 'success', text: `Operario ${data.operario.nombre} (${data.operario.rol}) listo. Escanea la orden.` })
-          setTimeout(() => batchIdRef.current?.focus(), 100)
+          setTimeout(() => batchIdRef.current?.focus(), 50)
         }
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error de conexión con el servidor.' })
       setUserQr('')
+      setTimeout(() => userQrRef.current?.focus(), 50)
     } finally {
       setLoading(false)
     }
   }
 
   const procesarBatchId = async (batch: string) => {
+    if (batchIdTimeoutRef.current) clearTimeout(batchIdTimeoutRef.current)
     setLoading(true)
     setMessage({ type: '', text: '' })
     try {
@@ -63,7 +108,7 @@ export default function FloorTerminal() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          qr_operario: operator.codigo_qr,
+          qr_operario: operator?.codigo_qr,
           qr_orden: batch
         })
       })
@@ -75,7 +120,7 @@ export default function FloorTerminal() {
         setUserQr('')
         setBatchId('')
         setOperator(null)
-        setTimeout(() => userQrRef.current?.focus(), 100)
+        setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
         setMessage({ 
           type: 'success', 
@@ -84,40 +129,74 @@ export default function FloorTerminal() {
         setUserQr('')
         setBatchId('')
         setOperator(null)
-        setTimeout(() => userQrRef.current?.focus(), 100)
+        setTimeout(() => userQrRef.current?.focus(), 50)
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Error de conexión con el servidor.' })
+      setUserQr('')
+      setBatchId('')
+      setOperator(null)
+      setTimeout(() => userQrRef.current?.focus(), 50)
     } finally {
       setLoading(false)
     }
   }
 
+  const handleUserQrKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (userQr.trim().length >= 4 && !operator && !loading) {
+        procesarUserQr(userQr.trim())
+      }
+    }
+  }
+
+  const handleBatchIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (batchId.trim().length >= 4 && operator && !loading) {
+        procesarBatchId(batchId.trim())
+      }
+    }
+  }
+
   // Auto-submit QRs sin necesidad de presionar Enter
   useEffect(() => {
-    if (!userQr || userQr.trim().length < 5 || operator || loading) return
-    const timeoutId = setTimeout(() => procesarUserQr(userQr.trim()), 350)
-    return () => clearTimeout(timeoutId)
-  }, [userQr])
+    if (!userQr || userQr.trim().length < 4 || operator || loading) return
+    userQrTimeoutRef.current = setTimeout(() => {
+      procesarUserQr(userQr.trim())
+    }, 350)
+    return () => {
+      if (userQrTimeoutRef.current) clearTimeout(userQrTimeoutRef.current)
+    }
+  }, [userQr, operator, loading])
 
   useEffect(() => {
-    if (!batchId || batchId.trim().length < 5 || !operator || loading) return
-    const timeoutId = setTimeout(() => procesarBatchId(batchId.trim()), 350)
-    return () => clearTimeout(timeoutId)
-  }, [batchId])
+    if (!batchId || batchId.trim().length < 4 || !operator || loading) return
+    batchIdTimeoutRef.current = setTimeout(() => {
+      procesarBatchId(batchId.trim())
+    }, 350)
+    return () => {
+      if (batchIdTimeoutRef.current) clearTimeout(batchIdTimeoutRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchId, operator, loading])
 
   const resetTerminal = () => {
+    if (userQrTimeoutRef.current) clearTimeout(userQrTimeoutRef.current)
+    if (batchIdTimeoutRef.current) clearTimeout(batchIdTimeoutRef.current)
     setUserQr('')
     setBatchId('')
     setOperator(null)
     setMessage({ type: '', text: '' })
-    userQrRef.current?.focus()
+    setTimeout(() => userQrRef.current?.focus(), 50)
   }
 
   return (
     <div className="terminal-container">
       <div className="glass-card terminal-card" style={{maxWidth: '650px'}}>
         <div className="terminal-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '60px', marginBottom: '1.5rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
           <h1>Terminal de Operario</h1>
           <p>Sistema de Escaneo Cero Digitación - GRAZZIA</p>
@@ -147,6 +226,7 @@ export default function FloorTerminal() {
                 className="modern-input pin-input"
                 value={userQr} 
                 onChange={(e) => setUserQr(e.target.value)}
+                onKeyDown={handleUserQrKeyDown}
                 placeholder="Ej: EMP-001"
                 disabled={operator !== null || loading}
                 style={{
@@ -178,6 +258,7 @@ export default function FloorTerminal() {
                 className="modern-input pin-input"
                 value={batchId} 
                 onChange={(e) => setBatchId(e.target.value)}
+                onKeyDown={handleBatchIdKeyDown}
                 placeholder="Ej: OP-0462"
                 disabled={!operator || loading}
                 style={{borderColor: 'var(--accent-blue)', marginTop: '10px'}}

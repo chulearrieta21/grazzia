@@ -402,3 +402,64 @@ h2 {
 .btn-export-excel:active {
   transform: translateY(0);
 }
+
+/* Minimalist action buttons for table */
+.action-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn-edit {
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+.action-btn-edit:hover {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.action-btn-codes {
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #3b82f6;
+}
+.action-btn-codes:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  color: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+}
+
+.action-btn-pdf {
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #10b981;
+}
+.action-btn-pdf:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.action-btn-delete {
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+.action-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #f87171;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+

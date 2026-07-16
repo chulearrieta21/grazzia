@@ -48,7 +48,7 @@ export default function ImprimirCarnets() {
             </div>
             
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', transform: 'scale(0.9)' }}>
-              <Barcode value={o.codigo_qr} height={60} width={2} fontSize={16} background="transparent" margin={0} />
+              <Barcode value={o.codigo_qr} text={`${o.nombre} - ${o.codigo_qr}`} height={60} width={2} fontSize={16} background="transparent" margin={0} />
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>

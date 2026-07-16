@@ -15,6 +15,15 @@ interface Operario {
 }
 interface Tarifa { id: number; rol: string; precio_por_par: number }
 interface TarifaRef { id: number; referencia: string; rol: string; precio_por_par: number }
+interface JornadaResumen {
+  id: string
+  operario: string
+  rol: string
+  fecha: string
+  horas: number
+  estado: string
+  eventos: string
+}
 
 // ── Alerts ───────────────────────────────────────────────────────────────────
 function Alert({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
@@ -61,9 +70,19 @@ export default function SupervisorDashboard() {
   const [tarifas, setTarifas] = useState<Tarifa[]>([])
   const [tarifasRef, setTarifasRef] = useState<TarifaRef[]>([])
   const [referencias, setReferencias] = useState<string[]>([])
-  const [jornadas, setJornadas] = useState<any[]>([])
+  const [jornadas, setJornadas] = useState<JornadaResumen[]>([])
+  // Asistencia Filters
+  const [asistenciaFilterType, setAsistenciaFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'año'>('todos')
+  const [asistenciaFilterDia, setAsistenciaFilterDia] = useState(() => {
+    const d = new Date()
+    return d.toISOString().split('T')[0]
+  })
+  const [asistenciaFilterSemana, setAsistenciaFilterSemana] = useState('')
+  const [asistenciaFilterMes, setAsistenciaFilterMes] = useState(getCurrMonthStr())
+  const [asistenciaFilterAño, setAsistenciaFilterAño] = useState(() => String(new Date().getFullYear()))
   const [loading, setLoading] = useState(true)
   const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set())
+  const [selectedOperarios, setSelectedOperarios] = useState<Set<number>>(new Set())
 
   // Order form
   const [orderId, setOrderId] = useState('')
@@ -194,6 +213,103 @@ export default function SupervisorDashboard() {
     catch { }
   }
 
+  const getISOWeekAndYear = (dateStr: string) => {
+    const d = new Date(dateStr + 'T00:00:00')
+    const dayNum = d.getDay() || 7
+    d.setDate(d.getDate() + 4 - dayNum)
+    const yearStart = new Date(d.getFullYear(), 0, 1)
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+    return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`
+  }
+
+  const filteredJornadas = jornadas.filter((j: JornadaResumen) => {
+    if (asistenciaFilterType === 'todos') return true
+    if (asistenciaFilterType === 'dia') return j.fecha === asistenciaFilterDia
+    if (asistenciaFilterType === 'mes') return j.fecha.startsWith(asistenciaFilterMes)
+    if (asistenciaFilterType === 'año') return j.fecha.startsWith(asistenciaFilterAño)
+    if (asistenciaFilterType === 'semana') {
+      if (!asistenciaFilterSemana) return true
+      return getISOWeekAndYear(j.fecha) === asistenciaFilterSemana
+    }
+    return true
+  })
+
+  const handleEliminarJornada = async (id: string, operario: string, fecha: string) => {
+    if (!confirm(`¿Eliminar todos los registros de asistencia de ${operario} del día ${fecha}?`)) return
+    const dashIdx = id.indexOf('-')
+    if (dashIdx === -1) return
+    const operarioId = id.substring(0, dashIdx)
+    try {
+      const r = await fetch(`${API}/jornadas?operario_id=${operarioId}&fecha=${fecha}`, {
+        method: 'DELETE'
+      })
+      const d = await r.json()
+      if (!r.ok) { showAlert(d.detail || 'Error al eliminar asistencia', 'error'); return }
+      showAlert(d.mensaje || 'Asistencia eliminada', 'success')
+      fetchJornadas()
+    } catch {
+      showAlert('Error al eliminar asistencia', 'error')
+    }
+  }
+
+  const handleExportAsistenciaExcel = () => {
+    if (!filteredJornadas || filteredJornadas.length === 0) {
+      showAlert('No hay datos de asistencia para exportar.', 'error')
+      return
+    }
+
+    const headers = [
+      'Fecha',
+      'Operario',
+      'Rol',
+      'Resumen Eventos',
+      'Horas Trabajadas',
+      'Estado'
+    ]
+
+    const rows = filteredJornadas.map((j: JornadaResumen) => [
+      j.fecha,
+      j.operario,
+      j.rol,
+      j.eventos,
+      j.horas,
+      j.estado.toUpperCase()
+    ])
+
+    const totalHoras = filteredJornadas.reduce((sum: number, j: JornadaResumen) => sum + (j.horas || 0), 0)
+
+    rows.push([
+      'TOTALES',
+      '',
+      '',
+      '',
+      totalHoras,
+      ''
+    ])
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    ws['!cols'] = [
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 35 },
+      { wch: 18 },
+      { wch: 15 }
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Asistencias')
+
+    let fileSuffix = asistenciaFilterType
+    if (asistenciaFilterType === 'dia') fileSuffix = asistenciaFilterDia
+    if (asistenciaFilterType === 'semana') fileSuffix = asistenciaFilterSemana
+    if (asistenciaFilterType === 'mes') fileSuffix = asistenciaFilterMes
+    if (asistenciaFilterType === 'año') fileSuffix = asistenciaFilterAño
+
+    XLSX.writeFile(wb, `Asistencias_${fileSuffix}.xlsx`)
+    showAlert('Archivo de asistencia exportado con éxito.', 'success')
+  }
+
   useEffect(() => {
     fetchAll()
     const interval = setInterval(fetchAll, 8000)
@@ -270,11 +386,10 @@ export default function SupervisorDashboard() {
 
       const url = isEditingOrder ? `${API}/ordenes/${editOrderId}` : `${API}/ordenes`
       const method = isEditingOrder ? 'PUT' : 'POST'
-      const payloadId = isEditingOrder ? editOrderId : orderId
 
       const r = await fetch(url, {
         method: method, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: payloadId, client, reference, color, sole, sizes: sizesStr, observations, totalQuantity, batchSize: totalQuantity, precio_referencia: precioReferencia })
+        body: JSON.stringify({ id: orderId, client, reference, color, sole, sizes: sizesStr, observations, totalQuantity, batchSize: totalQuantity, precio_referencia: precioReferencia })
       })
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
@@ -355,8 +470,46 @@ export default function SupervisorDashboard() {
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
       showAlert(d.mensaje, 'success')
+      const newSet = new Set(selectedOperarios)
+      newSet.delete(id)
+      setSelectedOperarios(newSet)
       fetchOperarios()
     } catch { showAlert('Error al eliminar operario.', 'error') }
+  }
+
+  const handleBulkDeleteOperarios = async () => {
+    const ids = Array.from(selectedOperarios)
+    if (ids.length === 0) return
+    if (!confirm(`¿Eliminar a los ${ids.length} operarios seleccionados? Esta acción no se puede deshacer.`)) return
+
+    let successCount = 0
+    const errors: string[] = []
+
+    for (const id of ids) {
+      const operario = operarios.find(o => o.id === id)
+      const nombre = operario ? operario.nombre : `ID: ${id}`
+      try {
+        const r = await fetch(`${API}/operarios/${id}`, { method: 'DELETE' })
+        const d = await r.json()
+        if (r.ok) {
+          successCount++
+        } else {
+          errors.push(`${nombre}: ${d.detail || 'Error al eliminar'}`)
+        }
+      } catch {
+        errors.push(`${nombre}: Error de red`)
+      }
+    }
+
+    if (successCount > 0) {
+      showAlert(`Se eliminaron ${successCount} operarios correctamente.`, 'success')
+      setSelectedOperarios(new Set())
+      fetchOperarios()
+    }
+    
+    if (errors.length > 0) {
+      showAlert(`No se pudieron eliminar algunos operarios:\n${errors.join('\n')}`, 'error')
+    }
   }
 
   const handleDeleteOrder = async (id: string) => {
@@ -366,8 +519,44 @@ export default function SupervisorDashboard() {
       const d = await r.json()
       if (!r.ok) { showAlert(d.detail, 'error'); return }
       showAlert(d.mensaje, 'success')
+      const newSet = new Set(selectedForPrint)
+      newSet.delete(id)
+      setSelectedForPrint(newSet)
       fetchOrders()
     } catch { showAlert('Error al eliminar la orden.', 'error') }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedForPrint)
+    if (ids.length === 0) return
+    if (!confirm(`¿Eliminar las ${ids.length} órdenes seleccionadas? Esta acción no se puede deshacer.`)) return
+
+    let successCount = 0
+    const errors: string[] = []
+
+    for (const id of ids) {
+      try {
+        const r = await fetch(`${API}/ordenes/${id}`, { method: 'DELETE' })
+        const d = await r.json()
+        if (r.ok) {
+          successCount++
+        } else {
+          errors.push(`${id}: ${d.detail || 'Error al eliminar'}`)
+        }
+      } catch {
+        errors.push(`${id}: Error de red`)
+      }
+    }
+
+    if (successCount > 0) {
+      showAlert(`Se eliminaron ${successCount} órdenes correctamente.`, 'success')
+      setSelectedForPrint(new Set())
+      fetchOrders()
+    }
+    
+    if (errors.length > 0) {
+      showAlert(`No se pudieron eliminar algunas órdenes:\n${errors.join('\n')}`, 'error')
+    }
   }
 
   const handleDeleteProduccion = async (id: number) => {
@@ -520,7 +709,7 @@ export default function SupervisorDashboard() {
             <form onSubmit={handleCreateOrder}>
               <div className="flex-row" style={{ marginBottom: '1rem' }}>
                 <label className="modern-label" style={{ flex: 1 }}>Nº de Orden (QR)
-                  <input className="modern-input" value={orderId} onChange={e => setOrderId(e.target.value)} required placeholder="Ej. OP-2026-001" disabled={isEditingOrder} />
+                  <input className="modern-input" value={orderId} onChange={e => setOrderId(e.target.value)} required placeholder="Ej. OP-2026-001" />
                 </label>
                 <label className="modern-label" style={{ flex: 1 }}>Cliente
                   <input className="modern-input" value={client} onChange={e => setClient(e.target.value)} required placeholder="Ej. Zapatos S.A." />
@@ -592,18 +781,42 @@ export default function SupervisorDashboard() {
           </div>
 
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2>Órdenes Activas</h2>
-              <button 
-                className="btn-primary" 
-                disabled={selectedForPrint.size === 0}
-                style={{ opacity: selectedForPrint.size === 0 ? 0.5 : 1, padding: '8px 16px', fontSize: '0.9rem' }}
-                onClick={() => {
-                  window.open('/imprimir?ids=' + Array.from(selectedForPrint).join(','), '_blank')
-                }}
-              >
-                🖨️ Imprimir Hojas de Ruta ({selectedForPrint.size})
-              </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  className="btn-primary" 
+                  disabled={selectedForPrint.size === 0}
+                  style={{ 
+                    opacity: selectedForPrint.size === 0 ? 0.5 : 1, 
+                    padding: '8px 16px', 
+                    fontSize: '0.9rem',
+                    cursor: selectedForPrint.size === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                  onClick={() => {
+                    window.open('/imprimir?ids=' + Array.from(selectedForPrint).join(','), '_blank')
+                  }}
+                >
+                  🖨️ Imprimir Hojas de Ruta ({selectedForPrint.size})
+                </button>
+                <button 
+                  className="btn-primary" 
+                  disabled={selectedForPrint.size === 0}
+                  style={{ 
+                    opacity: selectedForPrint.size === 0 ? 0.5 : 1, 
+                    padding: '8px 16px', 
+                    fontSize: '0.9rem',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#f87171',
+                    cursor: selectedForPrint.size === 0 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={handleBulkDelete}
+                >
+                  🗑️ Eliminar Seleccionadas ({selectedForPrint.size})
+                </button>
+              </div>
             </div>
             {loading ? <p style={{ color: 'var(--text-secondary)' }}>Cargando...</p> : (
               <div style={{ overflowX: 'auto' }}>
@@ -646,29 +859,16 @@ export default function SupervisorDashboard() {
                         <td>{o.reference} - {o.color}</td>
                         <td style={{ fontFamily: 'monospace' }}>{o.totalQuantity}</td>
                         <td style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button onClick={() => handleEditOrder(o)} style={{
-                            background: '#eab308', color: 'black', border: 'none',
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem'
-                          }}>
+                          <button onClick={() => handleEditOrder(o)} className="action-btn action-btn-edit">
                             ✏️ Editar
                           </button>
-                          <button onClick={() => setSelectedOrder(o)} style={{
-                            background: 'var(--accent-blue)', color: 'white', border: 'none',
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem'
-                          }}>
-                            Códigos
+                          <button onClick={() => setSelectedOrder(o)} className="action-btn action-btn-codes">
+                            🏷️ Códigos
                           </button>
-                          <button onClick={() => window.open(`/imprimir?ids=${o.id}`, '_blank')} style={{
-                            background: 'var(--accent-green)', color: 'white', border: 'none',
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem'
-                          }}>
-                            PDF
+                          <button onClick={() => window.open(`/imprimir?ids=${o.id}`, '_blank')} className="action-btn action-btn-pdf">
+                            📄 PDF
                           </button>
-                          <button onClick={() => handleDeleteOrder(o.id)} style={{
-                            background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)',
-                            color: '#f87171', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem',
-                            transition: 'all .2s'
-                          }}>
+                          <button onClick={() => handleDeleteOrder(o.id)} className="action-btn action-btn-delete">
                             🗑️ Eliminar
                           </button>
                         </td>
@@ -723,26 +923,70 @@ export default function SupervisorDashboard() {
 
           {/* Tabla de operarios */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 style={{ margin: 0 }}>Operarios Registrados</h2>
-              <button onClick={() => window.open('/imprimir/carnets', '_blank')} style={{
-                background: 'var(--accent-blue)', color: 'white', border: 'none',
-                padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 'bold'
-              }}>
-                🖨️ Imprimir Carnets
-              </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button onClick={() => window.open('/imprimir/carnets', '_blank')} style={{
+                  background: 'var(--accent-blue)', color: 'white', border: 'none',
+                  padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 'bold'
+                }}>
+                  🖨️ Imprimir Carnets
+                </button>
+                <button 
+                  className="btn-primary" 
+                  disabled={selectedOperarios.size === 0}
+                  style={{ 
+                    opacity: selectedOperarios.size === 0 ? 0.5 : 1, 
+                    padding: '8px 16px', 
+                    fontSize: '0.9rem',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    color: '#f87171',
+                    cursor: selectedOperarios.size === 0 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={handleBulkDeleteOperarios}
+                >
+                  🗑️ Eliminar Seleccionados ({selectedOperarios.size})
+                </button>
+              </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">
                 <thead>
                   <tr>
-                    <th>Nombre</th><th>Rol</th><th>QR</th><th>Tipo Pago</th><th>Valor</th><th></th>
+                    <th style={{ width: '40px', textAlign: 'center' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={operarios.length > 0 && selectedOperarios.size === operarios.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedOperarios(new Set(operarios.map(o => o.id)))
+                          } else {
+                            setSelectedOperarios(new Set())
+                          }
+                        }}
+                      />
+                    </th>
+                    <th>Nombre</th><th>Rol</th><th>QR</th><th>Tipo Pago</th><th>Valor</th><th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {operarios.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin operarios registrados.</td></tr>}
+                  {operarios.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin operarios registrados.</td></tr>}
                   {operarios.map(o => (
                     <tr key={o.id}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedOperarios.has(o.id)}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedOperarios)
+                            if (e.target.checked) newSet.add(o.id)
+                            else newSet.delete(o.id)
+                            setSelectedOperarios(newSet)
+                          }}
+                        />
+                      </td>
                       <td style={{ fontWeight: 600, color: 'white' }}>{o.nombre}</td>
                       <td>{o.rol}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{o.codigo_qr || '—'}</td>
@@ -757,7 +1001,9 @@ export default function SupervisorDashboard() {
                           : `$${(o.salario_dia ?? 0).toLocaleString()}/día`}
                       </td>
                       <td>
-                        <button style={btnDanger} onClick={() => handleEliminarOperario(o.id, o.nombre)}>Eliminar</button>
+                        <button onClick={() => handleEliminarOperario(o.id, o.nombre)} className="action-btn action-btn-delete">
+                          🗑️ Eliminar
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -950,14 +1196,77 @@ export default function SupervisorDashboard() {
       {/* ── TAB: Asistencia ── */}
       {tab === 'Asistencia' && (
         <div>
-          <h2>Reloj Control de Asistencia (Jornales)</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <h2>Reloj Control de Asistencia (Jornales)</h2>
+            <button onClick={handleExportAsistenciaExcel} className="btn-primary" style={{ background: 'var(--accent-green)', display: 'flex', alignItems: 'center', gap: '0.5rem', border: 'none' }}>
+              📊 Exportar a Excel
+            </button>
+          </div>
+
+          {/* Filtros de Asistencia */}
+          <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label className="modern-label" style={{ marginBottom: 0 }}>Filtrar por:
+              <select className="modern-input" value={asistenciaFilterType} onChange={e => setAsistenciaFilterType(e.target.value as any)} style={{ marginTop: '0.3rem' }}>
+                <option value="todos">Todos los registros</option>
+                <option value="dia">Por Día</option>
+                <option value="semana">Por Semana</option>
+                <option value="mes">Por Mes</option>
+                <option value="año">Por Año</option>
+              </select>
+            </label>
+
+            {asistenciaFilterType === 'dia' && (
+              <label className="modern-label" style={{ marginBottom: 0 }}>Seleccionar Día:
+                <input type="date" className="modern-input" value={asistenciaFilterDia} onChange={e => setAsistenciaFilterDia(e.target.value)} style={{ marginTop: '0.3rem' }} />
+              </label>
+            )}
+
+            {asistenciaFilterType === 'semana' && (
+              <label className="modern-label" style={{ marginBottom: 0 }}>Seleccionar Semana:
+                <input type="week" className="modern-input" value={asistenciaFilterSemana} onChange={e => setAsistenciaFilterSemana(e.target.value)} style={{ marginTop: '0.3rem' }} />
+              </label>
+            )}
+
+            {asistenciaFilterType === 'mes' && (
+              <label className="modern-label" style={{ marginBottom: 0 }}>Seleccionar Mes:
+                <input type="month" className="modern-input" value={asistenciaFilterMes} onChange={e => setAsistenciaFilterMes(e.target.value)} style={{ marginTop: '0.3rem' }} />
+              </label>
+            )}
+
+            {asistenciaFilterType === 'año' && (
+              <label className="modern-label" style={{ marginBottom: 0 }}>Seleccionar Año:
+                <select className="modern-input" value={asistenciaFilterAño} onChange={e => setAsistenciaFilterAño(e.target.value)} style={{ marginTop: '0.3rem' }}>
+                  {Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 2 + i)).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+
           <div className="glass-card" style={{ padding: '1.5rem' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="modern-table">
-                <thead><tr><th>Fecha</th><th>Operario</th><th>Rol</th><th>Resumen Eventos</th><th>Horas Trabajadas</th><th>Estado</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Operario</th>
+                    <th>Rol</th>
+                    <th>Resumen Eventos</th>
+                    <th>Horas Trabajadas</th>
+                    <th>Estado</th>
+                    <th style={{ width: '80px', textAlign: 'center' }}>Acción</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {jornadas.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin registros de asistencia.</td></tr>}
-                  {jornadas.map((j: any) => (
+                  {filteredJornadas.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        Sin registros de asistencia que coincidan con el filtro.
+                      </td>
+                    </tr>
+                  )}
+                  {filteredJornadas.map((j: JornadaResumen) => (
                     <tr key={j.id}>
                       <td style={{ color: 'var(--text-secondary)' }}>{j.fecha}</td>
                       <td style={{ fontWeight: 600, color: 'white' }}>{j.operario}</td>
@@ -968,6 +1277,22 @@ export default function SupervisorDashboard() {
                         <span className={`badge ${j.estado === 'Completada' ? 'badge-completed' : 'badge-pending'}`}>
                           {j.estado.toUpperCase()}
                         </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleEliminarJornada(j.id, j.operario, j.fecha)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--accent-red)',
+                            cursor: 'pointer',
+                            fontSize: '1.1rem',
+                            padding: '4px'
+                          }}
+                          title="Eliminar asistencia del día"
+                        >
+                          🗑️
+                        </button>
                       </td>
                     </tr>
                   ))}

@@ -86,6 +86,33 @@ try:
     migrar_tabla(models.Adelanto)
     migrar_tabla(models.PrecioLabor)
     migrar_tabla(models.TarifaReferencia)
+
+    # Corregir secuencias de IDs en PostgreSQL
+    if supabase_url.startswith("postgresql") or "supabase" in supabase_url:
+        print("\nRestableciendo secuencias de IDs en PostgreSQL/Supabase...")
+        from sqlalchemy import text
+        tables_to_reset = [
+            "usuarios",
+            "precios_labor",
+            "tarifas_referencia",
+            "produccion",
+            "registros_jornada",
+            "adelantos"
+        ]
+        for table in tables_to_reset:
+            try:
+                supabase_db.execute(text(f"""
+                    SELECT setval(
+                        pg_get_serial_sequence('{table}', 'id'),
+                        COALESCE(MAX(id), 1),
+                        MAX(id) IS NOT NULL
+                    ) FROM {table};
+                """))
+                print(f"Secuencia de '{table}' restablecida.")
+            except Exception as seq_err:
+                print(f"No se pudo restablecer secuencia de '{table}': {seq_err}")
+        supabase_db.commit()
+
     print("\nFelicidades! La migracion a Supabase se completo con exito.")
 except Exception as e:
     print(f"\nMigracion abortada debido a un error: {e}")
