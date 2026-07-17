@@ -1320,14 +1320,14 @@ export default function SupervisorDashboard() {
                     <span style={{color: 'var(--accent-green)'}}>GLOBAL</span>
                     <input type="number" className="modern-input" value={tPreciosRol['GLOBAL'] || ''} 
                            onChange={e => setTPreciosRol(prev => ({...prev, 'GLOBAL': e.target.value}))}
-                           placeholder="$ 0" min={0} step={50} style={{ marginTop: '5px', padding: '6px' }} />
+                           placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
                   </label>
                   {ROLES_PERMITIDOS.map(rol => (
                     <label key={rol} className="modern-label" style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       {rol}
                       <input type="number" className="modern-input" value={tPreciosRol[rol] || ''} 
                              onChange={e => setTPreciosRol(prev => ({...prev, [rol]: e.target.value}))}
-                             placeholder="$ 0" min={0} step={50} style={{ marginTop: '5px', padding: '6px' }} />
+                             placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
                     </label>
                   ))}
                 </div>
@@ -1414,7 +1414,7 @@ export default function SupervisorDashboard() {
                 </label>
                 <label className="modern-label">Precio por par ($)
                   <input type="number" className="modern-input" value={tGPrecio} onChange={e => setTGPrecio(e.target.value)}
-                    required placeholder="Ej. 1200" min={0} step={50} />
+                    required placeholder="Ej. 1200" min={0} step={1} />
                 </label>
                 <button type="submit" className="btn-primary" style={{ marginTop: '1rem' }}>Guardar Tarifa Global</button>
               </form>
@@ -1755,7 +1755,7 @@ export default function SupervisorDashboard() {
               </label>
               <label className="modern-label">Monto ($)
                 <input type="number" className="modern-input" value={aMonto} onChange={e => setAMonto(e.target.value)}
-                  required placeholder="Ej. 20000" min={1} step={1000} />
+                  required placeholder="Ej. 20000" min={1} step={1} />
               </label>
               <label className="modern-label">Observación / Nota
                 <input type="text" className="modern-input" value={aObservacion} onChange={e => setAObservacion(e.target.value)}
