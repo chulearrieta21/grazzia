@@ -1045,6 +1045,24 @@ def eliminar_tarifa_referencia(tarifa_id):
         return jsonify({"mensaje": f"Tarifa eliminada: {t.referencia} | {t.rol}"})
 
 
+@app.route("/api/v1/tarifas/referencia/delete-by-references", methods=["POST"])
+def eliminar_tarifas_referencia_bulk():
+    datos = request.json
+    referencias = datos.get("references", [])
+    if not isinstance(referencias, list) or len(referencias) == 0:
+        return jsonify({"detail": "Se requiere una lista de referencias."}), 400
+        
+    with next(get_db()) as db:
+        deleted = db.query(models.TarifaReferencia).filter(
+            models.TarifaReferencia.referencia.in_(referencias)
+        ).delete(synchronize_session=False)
+        db.commit()
+        registrar_bitacora(db, "TARIFA", "ELIMINAR_MASIVO", f"Eliminación masiva de tarifas para referencias: {', '.join(referencias)}. Total eliminadas: {deleted}")
+        db.commit()
+        
+    return jsonify({"mensaje": f"Se eliminaron todas las tarifas de las referencias seleccionadas. Total registros borrados: {deleted}."}), 200
+
+
 @app.route("/api/v1/tarifas/referencia/bulk-import", methods=["POST"])
 def bulk_import_tarifas_referencia():
     datos = request.json

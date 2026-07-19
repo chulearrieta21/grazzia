@@ -80,6 +80,7 @@ export default function SupervisorDashboard() {
   const [guiaFiltroEstado, setGuiaFiltroEstado] = useState<'activas' | 'completadas' | 'todas'>('activas')
   const [dragProcesoIdx, setDragProcesoIdx] = useState<number | null>(null)
   const [dragOverProcesoIdx, setDragOverProcesoIdx] = useState<number | null>(null)
+  const [selectedRefsForDeletion, setSelectedRefsForDeletion] = useState<string[]>([])
   // Asistencia Filters
   const [asistenciaFilterType, setAsistenciaFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'año'>('todos')
   const [asistenciaFilterDia, setAsistenciaFilterDia] = useState(() => {
@@ -702,6 +703,29 @@ export default function SupervisorDashboard() {
       showAlert(d.mensaje, 'success')
       fetchTarifasRef()
     } catch { showAlert('Error al eliminar tarifa.', 'error') }
+  }
+
+  const handleEliminarTarifasBulk = async () => {
+    if (selectedRefsForDeletion.length === 0) return
+    if (!confirm(`¿Eliminar todas las tarifas para las referencias seleccionadas: ${selectedRefsForDeletion.join(', ')}?`)) return
+    try {
+      const res = await fetch(`${API}/tarifas/referencia/delete-by-references`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ references: selectedRefsForDeletion })
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        showAlert(d.detail || 'Error al eliminar las tarifas seleccionadas.', 'error')
+      } else {
+        showAlert(d.mensaje, 'success')
+        setSelectedRefsForDeletion([])
+        fetchTarifasRef()
+        fetchReferencias()
+      }
+    } catch {
+      showAlert('Error al procesar la eliminación masiva.', 'error')
+    }
   }
 
   const handleImportExcelTarifas = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1479,6 +1503,29 @@ export default function SupervisorDashboard() {
 
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <h2>Tarifas por Referencia (Agrupadas)</h2>
+              {selectedRefsForDeletion.length > 0 && (
+                <div style={{
+                  display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '1.2rem',
+                  padding: '10px 16px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '10px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)'
+                }}>
+                  <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 600 }}>
+                    {selectedRefsForDeletion.length} seleccionada{selectedRefsForDeletion.length !== 1 ? 's' : ''} para borrar
+                  </span>
+                  <button type="button" onClick={handleEliminarTarifasBulk} className="btn-primary" style={{
+                    background: '#ef4444', color: 'white', padding: '6px 12px', fontSize: '0.85rem',
+                    borderRadius: '6px', cursor: 'pointer', border: 'none', marginLeft: 'auto'
+                  }}>
+                    🗑️ Borrar Tarifas
+                  </button>
+                  <button type="button" onClick={() => setSelectedRefsForDeletion([])} className="btn-primary" style={{
+                    background: 'rgba(255,255,255,0.08)', color: 'white', padding: '6px 12px', fontSize: '0.85rem',
+                    borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)'
+                  }}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '10px' }} className="custom-scrollbar">
                 {tarifasRef.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px' }}>Sin tarifas por referencia.</div>}
                 
@@ -1494,7 +1541,19 @@ export default function SupervisorDashboard() {
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'}
                   onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '150px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '180px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedRefsForDeletion.includes(ref)} 
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRefsForDeletion(prev => [...prev, ref])
+                          } else {
+                            setSelectedRefsForDeletion(prev => prev.filter(r => r !== ref))
+                          }
+                        }}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }} 
+                      />
                       <div style={{ background: 'linear-gradient(135deg, var(--accent-blue), #2563eb)', color: 'white', fontWeight: 'bold', padding: '8px 16px', borderRadius: '8px', fontSize: '1.1rem', boxShadow: '0 4px 10px rgba(59,130,246,0.3)' }}>
                         {ref}
                       </div>
