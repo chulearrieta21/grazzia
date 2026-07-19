@@ -704,6 +704,97 @@ export default function SupervisorDashboard() {
     } catch { showAlert('Error al eliminar tarifa.', 'error') }
   }
 
+  const handleImportExcelTarifas = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+        if (rows.length < 2) {
+          showAlert('El archivo Excel está vacío o no contiene suficientes filas.', 'error')
+          return
+        }
+
+        const headers = rows[0].map(h => String(h || '').trim())
+        const refIdx = headers.findIndex(h => h.toLowerCase() === 'referencia')
+        if (refIdx === -1) {
+          showAlert('No se encontró la columna "Referencia" en la cabecera del Excel.', 'error')
+          return
+        }
+
+        const rateColumns: { colName: string, idx: number }[] = []
+        headers.forEach((h, idx) => {
+          if (idx !== refIdx && h) {
+            rateColumns.push({ colName: h, idx })
+          }
+        })
+
+        if (rateColumns.length === 0) {
+          showAlert('No se encontraron columnas de procesos/tarifas.', 'error')
+          return
+        }
+
+        const payload: { referencia: string, rol: string, precio: number }[] = []
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i]
+          if (!row || row.length === 0) continue
+          
+          const rawRef = row[refIdx]
+          if (rawRef === undefined || rawRef === null) continue
+          const referencia = String(rawRef).trim()
+          if (!referencia) continue
+
+          rateColumns.forEach(col => {
+            const rawVal = row[col.idx]
+            if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+              const precio = parseFloat(String(rawVal).replace(/[$,\s]/g, ''))
+              if (!isNaN(precio)) {
+                payload.push({
+                  referencia,
+                  rol: col.colName,
+                  precio
+                })
+              }
+            }
+          })
+        }
+
+        if (payload.length === 0) {
+          showAlert('No se encontraron tarifas válidas para importar.', 'error')
+          return
+        }
+
+        const res = await fetch(`${API}/tarifas/referencia/bulk-import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        const d = await res.json()
+        if (!res.ok) {
+          showAlert(d.detail || 'Error al importar tarifas.', 'error')
+        } else {
+          showAlert(d.mensaje, 'success')
+          fetchTarifas()
+          fetchTarifasRef()
+          fetchReferencias()
+        }
+      } catch (err) {
+        showAlert('Error al procesar el archivo Excel.', 'error')
+        console.error(err)
+      } finally {
+        e.target.value = ''
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
   const handleGuardarTarifaGlobal = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -1334,6 +1425,25 @@ export default function SupervisorDashboard() {
 
                 <button type="submit" className="btn-primary" style={{ marginTop: '2rem', width: '100%', padding: '12px', fontSize: '1.1rem' }}>💾 Guardar Matriz de Precios</button>
               </form>
+
+              <div style={{
+                marginTop: '2.5rem', padding: '1.5rem', border: '2px dashed rgba(255,255,255,0.12)',
+                borderRadius: '12px', background: 'rgba(255,255,255,0.01)', textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>📥</div>
+                <div style={{ fontWeight: 'bold', fontSize: '0.98rem', marginBottom: '6px', color: 'white' }}>Importar Tarifas Masivamente</div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px', lineHeight: '1.5', maxWidth: '380px', margin: '0 auto 16px' }}>
+                  Carga un archivo Excel (.xlsx, .xls) con formato de matriz: columna A <strong style={{color:'white'}}>&quot;Referencia&quot;</strong> y columnas siguientes con los nombres de procesos (ej. Picado, Montado, etc.).
+                </p>
+                <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTarifas} style={{ display: 'none' }} id="excel-import-tarifas-input" />
+                <label htmlFor="excel-import-tarifas-input" className="btn-primary" style={{
+                  display: 'inline-block', cursor: 'pointer', background: 'var(--accent-blue)',
+                  padding: '10px 20px', fontSize: '0.9rem', borderRadius: '8px', fontWeight: 600,
+                  transition: 'all 0.2s'
+                }}>
+                  📁 Seleccionar Excel
+                </label>
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

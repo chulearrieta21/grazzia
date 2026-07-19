@@ -1045,6 +1045,55 @@ def eliminar_tarifa_referencia(tarifa_id):
         return jsonify({"mensaje": f"Tarifa eliminada: {t.referencia} | {t.rol}"})
 
 
+@app.route("/api/v1/tarifas/referencia/bulk-import", methods=["POST"])
+def bulk_import_tarifas_referencia():
+    datos = request.json
+    if not isinstance(datos, list):
+        return jsonify({"detail": "Se requiere una lista de tarifas."}), 400
+
+    if len(datos) == 0:
+        return jsonify({"detail": "La lista está vacía."}), 400
+
+    creados = 0
+    actualizados = 0
+    with next(get_db()) as db:
+        for item in datos:
+            referencia = str(item.get("referencia", "")).strip()
+            rol = str(item.get("rol", "")).strip()
+            precio = item.get("precio")
+
+            if not referencia or not rol or precio is None:
+                continue
+
+            try:
+                precio_float = float(precio)
+            except (ValueError, TypeError):
+                continue
+
+            existente = db.query(models.TarifaReferencia).filter(
+                models.TarifaReferencia.referencia == referencia,
+                models.TarifaReferencia.rol == rol
+            ).first()
+
+            if existente:
+                if existente.precio_por_par != precio_float:
+                    existente.precio_por_par = precio_float
+                    actualizados += 1
+            else:
+                db.add(models.TarifaReferencia(referencia=referencia, rol=rol, precio_por_par=precio_float))
+                creados += 1
+
+        db.commit()
+        registrar_bitacora(db, "TARIFA", "IMPORTAR", f"Importación masiva: {creados} creadas, {actualizados} actualizadas.")
+        db.commit()
+
+    return jsonify({
+        "mensaje": f"Importación masiva completada. Creadas: {creados}, Actualizadas: {actualizados}.",
+        "creados": creados,
+        "actualizados": actualizados
+    }), 200
+
+
 # ── Tarifas globales por rol (fallback) ──────────────────────────────────────
 @app.route("/api/v1/tarifas/global", methods=["GET"])
 def listar_tarifas_global():
