@@ -795,6 +795,28 @@ export default function SupervisorDashboard() {
     reader.readAsArrayBuffer(file)
   }
 
+  const handleDownloadTemplateExcel = () => {
+    const headers = ['Referencia', ...ROLES_PERMITIDOS]
+    const row1 = ['0202']
+    const row2 = ['1010']
+    ROLES_PERMITIDOS.forEach((_, idx) => {
+      row1.push(String(1200 + (idx * 100)))
+      row2.push(String(1500 - (idx * 50)))
+    })
+    
+    const data = [headers, row1, row2]
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    ws['!cols'] = [
+      { wch: 15 },
+      ...ROLES_PERMITIDOS.map(r => ({ wch: Math.max(12, r.length + 2) }))
+    ]
+    
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Tarifas')
+    XLSX.writeFile(wb, 'Plantilla_Tarifas_Matriz.xlsx')
+    showAlert('Plantilla de tarifas descargada con éxito.', 'success')
+  }
+
   const handleGuardarTarifaGlobal = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -1435,14 +1457,23 @@ export default function SupervisorDashboard() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px', lineHeight: '1.5', maxWidth: '380px', margin: '0 auto 16px' }}>
                   Carga un archivo Excel (.xlsx, .xls) con formato de matriz: columna A <strong style={{color:'white'}}>&quot;Referencia&quot;</strong> y columnas siguientes con los nombres de procesos (ej. Picado, Montado, etc.).
                 </p>
-                <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTarifas} style={{ display: 'none' }} id="excel-import-tarifas-input" />
-                <label htmlFor="excel-import-tarifas-input" className="btn-primary" style={{
-                  display: 'inline-block', cursor: 'pointer', background: 'var(--accent-blue)',
-                  padding: '10px 20px', fontSize: '0.9rem', borderRadius: '8px', fontWeight: 600,
-                  transition: 'all 0.2s'
-                }}>
-                  📁 Seleccionar Excel
-                </label>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTarifas} style={{ display: 'none' }} id="excel-import-tarifas-input" />
+                  <label htmlFor="excel-import-tarifas-input" className="btn-primary" style={{
+                    display: 'inline-block', cursor: 'pointer', background: 'var(--accent-blue)',
+                    padding: '10px 20px', fontSize: '0.9rem', borderRadius: '8px', fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}>
+                    📁 Seleccionar Excel
+                  </label>
+                  <button type="button" onClick={handleDownloadTemplateExcel} className="btn-primary" style={{
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                    color: 'white', padding: '10px 20px', fontSize: '0.9rem', borderRadius: '8px', fontWeight: 600,
+                    transition: 'all 0.2s', cursor: 'pointer'
+                  }}>
+                    📋 Descargar Plantilla
+                  </button>
+                </div>
               </div>
             </div>
 
