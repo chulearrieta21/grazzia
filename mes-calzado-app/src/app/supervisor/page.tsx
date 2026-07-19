@@ -81,6 +81,7 @@ export default function SupervisorDashboard() {
   const [dragProcesoIdx, setDragProcesoIdx] = useState<number | null>(null)
   const [dragOverProcesoIdx, setDragOverProcesoIdx] = useState<number | null>(null)
   const [selectedRefsForDeletion, setSelectedRefsForDeletion] = useState<string[]>([])
+  const allGroupedRefs = Array.from(new Set(tarifasRef.map(t => t.referencia))).sort()
   // Asistencia Filters
   const [asistenciaFilterType, setAsistenciaFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'año'>('todos')
   const [asistenciaFilterDia, setAsistenciaFilterDia] = useState(() => {
@@ -1502,7 +1503,26 @@ export default function SupervisorDashboard() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <h2>Tarifas por Referencia (Agrupadas)</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+                <h2 style={{ margin: 0 }}>Tarifas por Referencia (Agrupadas)</h2>
+                {allGroupedRefs.length > 0 && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={allGroupedRefs.length > 0 && allGroupedRefs.every(ref => selectedRefsForDeletion.includes(ref))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRefsForDeletion(allGroupedRefs)
+                        } else {
+                          setSelectedRefsForDeletion([])
+                        }
+                      }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                    />
+                    Seleccionar todas
+                  </label>
+                )}
+              </div>
               {selectedRefsForDeletion.length > 0 && (
                 <div style={{
                   display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '1.2rem',
