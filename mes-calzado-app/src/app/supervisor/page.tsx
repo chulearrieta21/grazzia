@@ -81,6 +81,7 @@ export default function SupervisorDashboard() {
   const [dragProcesoIdx, setDragProcesoIdx] = useState<number | null>(null)
   const [dragOverProcesoIdx, setDragOverProcesoIdx] = useState<number | null>(null)
   const [selectedRefsForDeletion, setSelectedRefsForDeletion] = useState<string[]>([])
+  const [isUploadingExcel, setIsUploadingExcel] = useState(false)
   const allGroupedRefs = Array.from(new Set(tarifasRef.map(t => t.referencia))).sort()
   // Asistencia Filters
   const [asistenciaFilterType, setAsistenciaFilterType] = useState<'todos' | 'dia' | 'semana' | 'mes' | 'año'>('todos')
@@ -733,6 +734,7 @@ export default function SupervisorDashboard() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    setIsUploadingExcel(true)
     const reader = new FileReader()
     reader.onload = async (evt) => {
       try {
@@ -744,6 +746,7 @@ export default function SupervisorDashboard() {
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
         if (rows.length < 2) {
           showAlert('El archivo Excel está vacío o no contiene suficientes filas.', 'error')
+          setIsUploadingExcel(false)
           return
         }
 
@@ -751,6 +754,7 @@ export default function SupervisorDashboard() {
         const refIdx = headers.findIndex(h => h.toLowerCase() === 'referencia')
         if (refIdx === -1) {
           showAlert('No se encontró la columna "Referencia" en la cabecera del Excel.', 'error')
+          setIsUploadingExcel(false)
           return
         }
 
@@ -763,6 +767,7 @@ export default function SupervisorDashboard() {
 
         if (rateColumns.length === 0) {
           showAlert('No se encontraron columnas de procesos/tarifas.', 'error')
+          setIsUploadingExcel(false)
           return
         }
 
@@ -793,6 +798,7 @@ export default function SupervisorDashboard() {
 
         if (payload.length === 0) {
           showAlert('No se encontraron tarifas válidas para importar.', 'error')
+          setIsUploadingExcel(false)
           return
         }
 
@@ -814,9 +820,16 @@ export default function SupervisorDashboard() {
         showAlert('Error al procesar el archivo Excel.', 'error')
         console.error(err)
       } finally {
+        setIsUploadingExcel(false)
         e.target.value = ''
       }
     }
+    
+    reader.onerror = () => {
+      showAlert('Error al leer el archivo Excel.', 'error')
+      setIsUploadingExcel(false)
+    }
+
     reader.readAsArrayBuffer(file)
   }
 
@@ -2184,6 +2197,37 @@ export default function SupervisorDashboard() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {isUploadingExcel && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, transition: 'all 0.3s ease'
+        }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '20px', padding: '3rem', textAlign: 'center', maxWidth: '400px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)'
+          }}>
+            <div className="spinner" style={{
+              width: '50px', height: '50px', border: '4px solid rgba(255,255,255,0.1)',
+              borderTop: '4px solid var(--accent-blue)', borderRadius: '50%',
+              animation: 'spin 1s linear infinite', margin: '0 auto 1.5rem'
+            }} />
+            <h3 style={{ margin: '0 0 10px 0', color: 'white', fontSize: '1.2rem' }}>Subiendo Tarifas</h3>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+              Estamos analizando tu archivo Excel y actualizando la base de datos de tarifas. No cierres esta ventana.
+            </p>
+          </div>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       )}
     </div>
