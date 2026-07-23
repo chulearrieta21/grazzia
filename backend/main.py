@@ -65,6 +65,63 @@ def registrar_bitacora(db, tipo: str, accion: str, descripcion: str, detalle: st
         pass  # No bloquear si falla el log
 
 
+def calcular_resumen_operario(db, operario_id: int):
+    """Calcula la producción del día y el acumulado de la nómina semanal para un operario."""
+    operario = db.query(models.Usuario).filter(models.Usuario.id == operario_id).first()
+    if not operario:
+        return {}
+
+    c_now = colombia_now()
+    hoy_inicio = datetime(c_now.year, c_now.month, c_now.day)
+    lunes_inicio = hoy_inicio - timedelta(days=hoy_inicio.weekday())
+
+    if operario.tipo_pago == "por_produccion":
+        prods_hoy = db.query(models.Produccion).filter(
+            models.Produccion.id_operario == operario.id,
+            models.Produccion.fecha_registro >= hoy_inicio
+        ).all()
+        pares_hoy = sum(p.pares_realizados for p in prods_hoy)
+        ganado_hoy = sum(p.valor_pagar for p in prods_hoy)
+
+        prods_semana = db.query(models.Produccion).filter(
+            models.Produccion.id_operario == operario.id,
+            models.Produccion.fecha_registro >= lunes_inicio
+        ).all()
+        pares_semana = sum(p.pares_realizados for p in prods_semana)
+        ganado_semana = sum(p.valor_pagar for p in prods_semana)
+    else:
+        jornada_hoy = db.query(models.RegistroJornada).filter(
+            models.RegistroJornada.id_operario == operario.id,
+            models.RegistroJornada.fecha >= hoy_inicio
+        ).first()
+        pares_hoy = 0
+        ganado_hoy = float(operario.salario_dia or 0.0) if jornada_hoy else 0.0
+
+        jornadas_semana = db.query(models.RegistroJornada).filter(
+            models.RegistroJornada.id_operario == operario.id,
+            models.RegistroJornada.fecha >= lunes_inicio,
+            models.RegistroJornada.tipo == "entrada"
+        ).all()
+        dias_unicos = len(set(j.fecha.date() for j in jornadas_semana))
+        pares_semana = 0
+        ganado_semana = float(dias_unicos * (operario.salario_dia or 0.0))
+
+    adelantos_semana = db.query(models.Adelanto).filter(
+        models.Adelanto.id_operario == operario.id,
+        models.Adelanto.fecha >= lunes_inicio
+    ).all()
+    total_adelantos = sum(a.monto for a in adelantos_semana)
+
+    return {
+        "pares_hoy": pares_hoy,
+        "ganado_hoy": ganado_hoy,
+        "pares_semana": pares_semana,
+        "ganado_semana": ganado_semana,
+        "total_adelantos_semana": total_adelantos,
+        "saldo_neto_semana": ganado_semana - total_adelantos
+    }
+
+
 # ── Datos de ejemplo ────────────────────────────────────────────────────────
 with next(get_db()) as db:
     if not db.query(models.Proceso).first():
@@ -109,13 +166,16 @@ def escanear_qr():
         if not operario:
             return jsonify({"detail": "QR no reconocido. Operario no encontrado."}), 404
 
+        resumen = calcular_resumen_operario(db, operario.id)
+
         # ── Por producción ────────────────────────────────────────────────
         if operario.tipo_pago == "por_produccion":
             return jsonify({
                 "tipo_pago": "por_produccion",
                 "operario": {"id": operario.id, "nombre": operario.nombre, "rol": operario.rol, "codigo_qr": operario.codigo_qr},
                 "instruccion": "Escanea el QR de la Orden de Producción para ver tu tarifa específica.",
-                "accion_requerida": "escanear_orden"
+                "accion_requerida": "escanear_orden",
+                "resumen": resumen
             }), 200
 
         # ── Por día ───────────────────────────────────────────────────────
@@ -136,6 +196,9 @@ def escanear_qr():
         ))
         db.commit()
 
+        # Recalcular resumen tras registrar jornada por día
+        resumen = calcular_resumen_operario(db, operario.id)
+
         return jsonify({
             "tipo_pago": "por_dia",
             "operario": {"id": operario.id, "nombre": operario.nombre, "rol": operario.rol, "codigo_qr": operario.codigo_qr},
@@ -144,7 +207,8 @@ def escanear_qr():
             "hora": c_now.strftime("%H:%M:%S"),
             "fecha": hoy.strftime("%Y-%m-%d"),
             "mensaje": f"{'Entrada' if tipo_a_registrar == 'entrada' else 'Salida'} registrada para {operario.nombre}. Valor del día: ${operario.salario_dia:,.0f}",
-            "accion_requerida": "ninguna"
+            "accion_requerida": "ninguna",
+            "resumen": resumen
         }), 200
 
 
@@ -442,6 +506,7 @@ def registrar_produccion():
         # ──────────────────────────────────────────────────────────────────────
 
         db.commit()
+        resumen = calcular_resumen_operario(db, operario.id)
         return jsonify({
             "mensaje": "Producción registrada",
             "referencia": orden.referencia,
@@ -449,7 +514,8 @@ def registrar_produccion():
             "pares": pares_reportados,
             "valor_ganado": valor_total,
             "operario": operario.nombre,
-            "proceso": operario.rol
+            "proceso": operario.rol,
+            "resumen": resumen
         })
 
 # ── Eliminar producción ──────────────────────────────────────────────────────

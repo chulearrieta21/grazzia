@@ -463,3 +463,144 @@ h2 {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
 }
 
+/* Floating Stats Banner for Operario */
+.floating-stats-banner {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  width: 440px;
+  max-width: calc(100vw - 48px);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(59, 130, 246, 0.25);
+  border-radius: 16px;
+  padding: 16px 20px;
+  z-index: 9999;
+  animation: slideInRightBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@keyframes slideInRightBanner {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.stats-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.stats-user-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-user-icon {
+  font-size: 1.4rem;
+}
+
+.stats-user-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #ffffff;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.stats-user-role {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.stats-live-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stat-card.stat-today {
+  border-left: 3px solid #3b82f6;
+}
+
+.stat-card.stat-week {
+  border-left: 3px solid #10b981;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.stat-unit {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.stat-subtext {
+  font-size: 0.8rem;
+  color: #38bdf8;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.stats-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  width: 100%;
+  animation: shrinkProgress 7s linear forwards;
+}
+
+@keyframes shrinkProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+

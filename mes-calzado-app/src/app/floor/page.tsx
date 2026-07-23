@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 
-const API = 'https://grazzia-backend.onrender.com/api/v1'
+const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8000/api/v1'
+  : 'https://grazzia-backend.onrender.com/api/v1'
 
 interface Operario {
   id: number
@@ -14,6 +16,21 @@ interface Operario {
   precio_por_par: number | null
 }
 
+interface ResumenOperario {
+  pares_hoy: number
+  ganado_hoy: number
+  pares_semana: number
+  ganado_semana: number
+  total_adelantos_semana: number
+  saldo_neto_semana: number
+}
+
+interface StatsNotification {
+  operarioNombre: string
+  operarioRol: string
+  resumen: ResumenOperario
+}
+
 export default function FloorTerminal() {
   const [userQr, setUserQr] = useState('')
   const [batchId, setBatchId] = useState('')
@@ -21,11 +38,26 @@ export default function FloorTerminal() {
   
   const [message, setMessage] = useState({ type: '', text: '' })
   const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState<StatsNotification | null>(null)
 
   const userQrRef = useRef<HTMLInputElement>(null)
   const batchIdRef = useRef<HTMLInputElement>(null)
   const userQrTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const batchIdTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const statsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const triggerStats = (nombre: string, rol: string, resumen?: ResumenOperario) => {
+    if (statsTimeoutRef.current) clearTimeout(statsTimeoutRef.current)
+    if (!resumen) return
+    setStats({
+      operarioNombre: nombre,
+      operarioRol: rol,
+      resumen
+    })
+    statsTimeoutRef.current = setTimeout(() => {
+      setStats(null)
+    }, 7000) // 7 segundos de visibilidad flotante
+  }
 
   // Keep focus on active input
   useEffect(() => {
@@ -80,6 +112,10 @@ export default function FloorTerminal() {
         setUserQr('')
         setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
+        if (data.resumen && data.operario) {
+          triggerStats(data.operario.nombre, data.operario.rol, data.resumen)
+        }
+
         if (data.tipo_pago === 'por_dia') {
           setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
           setUserQr('')
@@ -122,6 +158,10 @@ export default function FloorTerminal() {
         setOperator(null)
         setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
+        if (data.resumen && operator) {
+          triggerStats(operator.nombre, operator.rol, data.resumen)
+        }
+
         setMessage({ 
           type: 'success', 
           text: `¡Éxito! ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}` 
@@ -194,6 +234,40 @@ export default function FloorTerminal() {
 
   return (
     <div className="terminal-container">
+      {/* ── Banner Flotante de Producción y Nómina ────────────────────────── */}
+      {stats && (
+        <div className="floating-stats-banner">
+          <div className="stats-banner-header">
+            <div className="stats-user-badge">
+              <span className="stats-user-icon">👤</span>
+              <div>
+                <span className="stats-user-name">{stats.operarioNombre}</span>
+                <span className="stats-user-role">({stats.operarioRol})</span>
+              </div>
+            </div>
+            <div className="stats-live-tag">⚡ PRODUCCIÓN Y NÓMINA</div>
+          </div>
+
+          <div className="stats-grid">
+            <div className="stat-card stat-today">
+              <div className="stat-label">Producción de Hoy</div>
+              <div className="stat-value">{stats.resumen.pares_hoy} <span className="stat-unit">prs</span></div>
+              <div className="stat-subtext">${stats.resumen.ganado_hoy?.toLocaleString()} COP hoy</div>
+            </div>
+
+            <div className="stat-card stat-week">
+              <div className="stat-label">Nómina Acumulada Semana</div>
+              <div className="stat-value">${stats.resumen.ganado_semana?.toLocaleString()} <span className="stat-unit">COP</span></div>
+              <div className="stat-subtext">
+                {stats.resumen.pares_semana > 0 ? `${stats.resumen.pares_semana} pares acumulados` : 'Registro por día'}
+              </div>
+            </div>
+          </div>
+
+          <div className="stats-progress-bar"></div>
+        </div>
+      )}
+
       <div className="glass-card terminal-card" style={{maxWidth: '650px'}}>
         <div className="terminal-header">
           {/* eslint-disable-next-line @next/next/no-img-element */}
