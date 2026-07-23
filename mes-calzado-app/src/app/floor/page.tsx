@@ -56,7 +56,7 @@ export default function FloorTerminal() {
     })
     statsTimeoutRef.current = setTimeout(() => {
       setStats(null)
-    }, 7000) // 7 segundos de visibilidad flotante
+    }, 20000) // 20 segundos de visibilidad flotante
   }
 
   // Keep focus on active input
