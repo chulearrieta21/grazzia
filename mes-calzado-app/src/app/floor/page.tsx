@@ -112,8 +112,10 @@ export default function FloorTerminal() {
         setUserQr('')
         setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
-        if (data.resumen && data.operario) {
-          triggerStats(data.operario.nombre, data.operario.rol, data.resumen)
+        if (data.resumen) {
+          const opNombre = typeof data.operario === 'object' ? data.operario?.nombre : (typeof data.operario === 'string' ? data.operario : 'Operario')
+          const opRol = typeof data.operario === 'object' ? data.operario?.rol : (data.proceso || 'Operario')
+          triggerStats(opNombre, opRol, data.resumen)
         }
 
         if (data.tipo_pago === 'por_dia') {
@@ -158,8 +160,10 @@ export default function FloorTerminal() {
         setOperator(null)
         setTimeout(() => userQrRef.current?.focus(), 50)
       } else {
-        if (data.resumen && operator) {
-          triggerStats(operator.nombre, operator.rol, data.resumen)
+        if (data.resumen) {
+          const opNombre = typeof data.operario === 'string' ? data.operario : (operator?.nombre || 'Operario')
+          const opRol = data.proceso || operator?.rol || 'Producción'
+          triggerStats(opNombre, opRol, data.resumen)
         }
 
         setMessage({ 
