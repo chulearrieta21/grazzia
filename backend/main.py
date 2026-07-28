@@ -621,12 +621,22 @@ def calcular_nomina():
         else:
             now = colombia_now()
             year, month = now.year, now.month
-            
-        start_date = datetime(year, month, 1)
+
+        quincena_param = request.args.get("quincena", "MES")
+
         if month == 12:
-            end_date = datetime(year + 1, 1, 1)
+            next_month_date = datetime(year + 1, 1, 1)
         else:
-            end_date = datetime(year, month + 1, 1)
+            next_month_date = datetime(year, month + 1, 1)
+
+        start_date = datetime(year, month, 1)
+        if quincena_param == "Q1":
+            end_date = datetime(year, month, 16)
+        elif quincena_param == "Q2":
+            start_date = datetime(year, month, 16)
+            end_date = next_month_date
+        else:
+            end_date = next_month_date
 
         # Inicializar nomina_dict para todos los operarios activos (no admins)
         operarios = db.query(models.Usuario).filter(models.Usuario.es_admin == False).all()

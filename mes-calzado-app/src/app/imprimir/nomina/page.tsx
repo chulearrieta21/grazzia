@@ -11,6 +11,7 @@ const API = typeof window !== 'undefined' && window.location.hostname === 'local
 function ImprimirNominaContent() {
   const searchParams = useSearchParams()
   const mes = searchParams.get('mes')
+  const quincena = searchParams.get('quincena') || 'MES'
   const [payrollData, setPayrollData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,7 +20,7 @@ function ImprimirNominaContent() {
     document.body.classList.add('print-mode')
 
     if (mes) {
-      fetch(`${API}/nomina?mes=${mes}`)
+      fetch(`${API}/nomina?mes=${mes}&quincena=${quincena}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -87,31 +88,31 @@ function ImprimirNominaContent() {
   return (
     <div className="print-container">
       {/* Botón flotante para impresión manual (se oculta al imprimir con .no-print) */}
-      <div className="no-print" style={{ 
-        padding: '1rem', 
-        textAlign: 'center', 
-        background: '#f8fafc', 
-        borderBottom: '1px solid #e2e8f0', 
-        marginBottom: '2rem', 
-        borderRadius: '8px', 
+      <div className="no-print" style={{
+        padding: '1rem',
+        textAlign: 'center',
+        background: '#f8fafc',
+        borderBottom: '1px solid #e2e8f0',
+        marginBottom: '2rem',
+        borderRadius: '8px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         fontFamily: 'Arial, sans-serif'
       }}>
         <p style={{ color: '#475569', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
           Para guardar como PDF: En el cuadro de diálogo de impresión del navegador, cambia el destino a <strong>"Guardar como PDF"</strong>.
         </p>
-        <button 
+        <button
           onClick={() => window.print()}
-          style={{ 
-            padding: '10px 20px', 
-            background: '#10b981', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '6px', 
-            cursor: 'pointer', 
-            fontSize: '1rem', 
-            fontWeight: 'bold', 
-            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)' 
+          style={{
+            padding: '10px 20px',
+            background: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
           }}
         >
           🖨️ Imprimir / Guardar PDF
@@ -120,13 +121,13 @@ function ImprimirNominaContent() {
 
       <div style={{ maxWidth: '1000px', margin: '0 auto', background: 'white', padding: '10px', fontFamily: 'Arial, sans-serif' }}>
         {/* Cabecera del Reporte */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          borderBottom: '3px double #0f172a', 
-          paddingBottom: '1.5rem', 
-          marginBottom: '2rem' 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '3px double #0f172a',
+          paddingBottom: '1.5rem',
+          marginBottom: '2rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <img src="/logo.png" alt="GRAZZIA" style={{ maxHeight: '65px', objectFit: 'contain' }} />
@@ -136,7 +137,7 @@ function ImprimirNominaContent() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 'bold' }}>NÓMINA MENSUAL</h2>
+            <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 'bold' }}>NÓMINA {quincena === 'Q1' ? '1RA QUINCENA' : quincena === 'Q2' ? '2DA QUINCENA' : 'MENSUAL'}</h2>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.1rem', color: '#10b981', fontWeight: 'bold', textTransform: 'uppercase' }}>
               Mes: {formatMonth(mes)}
             </p>
@@ -174,7 +175,7 @@ function ImprimirNominaContent() {
                 </tr>
               )
             })}
-            
+
             {/* Fila de Totales */}
             <tr style={{ borderTop: '2px solid #0f172a', borderBottom: '2px solid #0f172a', fontWeight: 'bold', background: '#f8fafc' }}>
               <td colSpan={2} style={{ padding: '14px 8px', color: '#0f172a' }}>TOTALES DEL MES</td>

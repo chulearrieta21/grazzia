@@ -63,6 +63,7 @@ export default function SupervisorDashboard() {
   const [tab, setTab] = useState<Tab>('Órdenes')
   const [alert, setAlert] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(getCurrMonthStr())
+  const [payrollQuincena, setPayrollQuincena] = useState<'Q1' | 'Q2' | 'MES'>('MES')
 
   // Shared data
   const [orders, setOrders] = useState<any[]>([])
@@ -107,7 +108,7 @@ export default function SupervisorDashboard() {
   const [sizeMap, setSizeMap] = useState<Record<string, string>>(INITIAL_SIZES)
   const [observations, setObservations] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
-  
+
   const [tallaInicio, setTallaInicio] = useState('21')
   const [tallaFin, setTallaFin] = useState('43')
 
@@ -120,7 +121,7 @@ export default function SupervisorDashboard() {
       setTallaFin(val)
       newFin = val
     }
-    
+
     const limitFin = parseInt(newFin)
     const newSizeMap = { ...sizeMap }
     Object.keys(newSizeMap).forEach(sz => {
@@ -141,7 +142,7 @@ export default function SupervisorDashboard() {
       setTallaInicio(val)
       newInicio = val
     }
-    
+
     const limitInicio = parseInt(newInicio)
     const newSizeMap = { ...sizeMap }
     Object.keys(newSizeMap).forEach(sz => {
@@ -152,7 +153,7 @@ export default function SupervisorDashboard() {
     })
     setSizeMap(newSizeMap)
   }
-  
+
   const [isEditingOrder, setIsEditingOrder] = useState(false)
   const [editOrderId, setEditOrderId] = useState('')
 
@@ -174,7 +175,7 @@ export default function SupervisorDashboard() {
 
   // Tarifa por referencia form
   const [tRef, setTRef] = useState('')
-  const [tPreciosRol, setTPreciosRol] = useState<{[key: string]: string}>({})
+  const [tPreciosRol, setTPreciosRol] = useState<{ [key: string]: string }>({})
   // Tarifa global form
   const [tGRol, setTGRol] = useState('')
   const [tGPrecio, setTGPrecio] = useState('')
@@ -191,7 +192,7 @@ export default function SupervisorDashboard() {
 
   // ── Fetchers ───────────────────────────────────────────────────────────────
   const fetchAll = () => {
-    fetchOrders(); fetchMovements(); fetchPayroll(selectedMonth); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos(); fetchProcesos(); fetchBitacora(); fetchGuia(guiaFiltroEstado)
+    fetchOrders(); fetchMovements(); fetchPayroll(selectedMonth, payrollQuincena); fetchOperarios(); fetchTarifas(); fetchTarifasRef(); fetchReferencias(); fetchJornadas(); fetchAdelantos(); fetchProcesos(); fetchBitacora(); fetchGuia(guiaFiltroEstado)
   }
 
   const fetchOrders = async () => {
@@ -202,9 +203,10 @@ export default function SupervisorDashboard() {
     try { const r = await fetch(`${API}/produccion`); const d = await r.json(); if (Array.isArray(d)) setMovements(d) }
     catch { }
   }
-  const fetchPayroll = async (monthStr?: string) => {
+  const fetchPayroll = async (monthStr?: string, quincenaStr?: string) => {
     const targetMonth = monthStr || selectedMonth
-    try { const r = await fetch(`${API}/nomina?mes=${targetMonth}`); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
+    const targetQuincena = quincenaStr || payrollQuincena
+    try { const r = await fetch(`${API}/nomina?mes=${targetMonth}&quincena=${targetQuincena}`); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
     catch { }
   }
   const fetchOperarios = async () => {
@@ -248,7 +250,7 @@ export default function SupervisorDashboard() {
     const nuevos = [...procesos]
     const swapIdx = direccion === 'up' ? index - 1 : index + 1
     if (swapIdx < 0 || swapIdx >= nuevos.length) return
-    ;[nuevos[index], nuevos[swapIdx]] = [nuevos[swapIdx], nuevos[index]]
+      ;[nuevos[index], nuevos[swapIdx]] = [nuevos[swapIdx], nuevos[index]]
     const ids = nuevos.map(p => p.id)
     try {
       const r = await fetch(`${API}/procesos/reordenar`, {
@@ -362,7 +364,7 @@ export default function SupervisorDashboard() {
     fetchAll()
     const interval = setInterval(fetchAll, 8000)
     return () => clearInterval(interval)
-  }, [selectedMonth])
+  }, [selectedMonth, payrollQuincena])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleExportExcel = () => {
@@ -421,7 +423,7 @@ export default function SupervisorDashboard() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Nomina')
 
-    const fileName = `Nomina_Grazzia_${selectedMonth}.xlsx`
+    const fileName = `Nomina_Grazzia_${selectedMonth}_${payrollQuincena}.xlsx`
     XLSX.writeFile(wb, fileName)
   }
 
@@ -443,7 +445,7 @@ export default function SupervisorDashboard() {
       if (!r.ok) { showAlert(d.detail, 'error'); return }
 
       setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca('GRAZZIA'); setPrecioReferencia('');
-      setSizeMap(INITIAL_SIZES); 
+      setSizeMap(INITIAL_SIZES);
       setObservations(''); setIsEditingOrder(false); setEditOrderId('');
       setTallaInicio('21'); setTallaFin('43');
       fetchOrders()
@@ -453,7 +455,7 @@ export default function SupervisorDashboard() {
 
   const cancelEditOrder = () => {
     setOrderId(''); setClient(''); setReference(''); setColor(''); setSole(''); setMarca('GRAZZIA'); setPrecioReferencia('');
-    setSizeMap(INITIAL_SIZES); 
+    setSizeMap(INITIAL_SIZES);
     setObservations(''); setIsEditingOrder(false); setEditOrderId('');
     setTallaInicio('21'); setTallaFin('43');
   }
@@ -469,7 +471,7 @@ export default function SupervisorDashboard() {
     setMarca(o.marca || '')
     setObservations(o.observations)
     setPrecioReferencia(o.precio_referencia !== null ? String(o.precio_referencia) : '')
-    
+
     const newSizeMap = { ...INITIAL_SIZES }
     let minSz = 43
     let maxSz = 21
@@ -538,18 +540,18 @@ export default function SupervisorDashboard() {
 
   const handleEditTarifaRefGroup = (ref: string, items: TarifaRef[]) => {
     setTRef(ref)
-    const precios: {[key: string]: string} = {}
-    
+    const precios: { [key: string]: string } = {}
+
     precios['GLOBAL'] = ''
     ROLES_PERMITIDOS.forEach(rol => {
       precios[rol] = ''
     })
-    
+
     items.forEach(t => {
       precios[t.rol] = String(t.precio_por_par)
     })
     setTPreciosRol(precios)
-    
+
     const formEl = document.querySelector('form[onSubmit*="handleGuardarTarifaRef"]')
     if (formEl) {
       formEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -599,7 +601,7 @@ export default function SupervisorDashboard() {
       setSelectedOperarios(new Set())
       fetchOperarios()
     }
-    
+
     if (errors.length > 0) {
       showAlert(`No se pudieron eliminar algunos operarios:\n${errors.join('\n')}`, 'error')
     }
@@ -646,7 +648,7 @@ export default function SupervisorDashboard() {
       setSelectedForPrint(new Set())
       fetchOrders()
     }
-    
+
     if (errors.length > 0) {
       showAlert(`No se pudieron eliminar algunas órdenes:\n${errors.join('\n')}`, 'error')
     }
@@ -666,18 +668,18 @@ export default function SupervisorDashboard() {
 
   const handleGuardarTarifaRef = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const tarifasBatch = []
     if (tPreciosRol['GLOBAL'] && tPreciosRol['GLOBAL'].trim() !== '') {
-       tarifasBatch.push({ rol: 'GLOBAL', precio: parseFloat(tPreciosRol['GLOBAL']) })
+      tarifasBatch.push({ rol: 'GLOBAL', precio: parseFloat(tPreciosRol['GLOBAL']) })
     }
-    
+
     ROLES_PERMITIDOS.forEach(rol => {
       if (tPreciosRol[rol] && tPreciosRol[rol].trim() !== '') {
         tarifasBatch.push({ rol, precio: parseFloat(tPreciosRol[rol]) })
       }
     })
-    
+
     if (tarifasBatch.length === 0) {
       showAlert('Debe ingresar al menos un precio para la matriz.', 'error')
       return
@@ -742,7 +744,7 @@ export default function SupervisorDashboard() {
         const workbook = XLSX.read(data, { type: 'array' })
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
-        
+
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
         if (rows.length < 2) {
           showAlert('El archivo Excel está vacío o no contiene suficientes filas.', 'error')
@@ -775,7 +777,7 @@ export default function SupervisorDashboard() {
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i]
           if (!row || row.length === 0) continue
-          
+
           const rawRef = row[refIdx]
           if (rawRef === undefined || rawRef === null) continue
           const referencia = String(rawRef).trim()
@@ -824,7 +826,7 @@ export default function SupervisorDashboard() {
         e.target.value = ''
       }
     }
-    
+
     reader.onerror = () => {
       showAlert('Error al leer el archivo Excel.', 'error')
       setIsUploadingExcel(false)
@@ -841,14 +843,14 @@ export default function SupervisorDashboard() {
       row1.push(String(1200 + (idx * 100)))
       row2.push(String(1500 - (idx * 50)))
     })
-    
+
     const data = [headers, row1, row2]
     const ws = XLSX.utils.aoa_to_sheet(data)
     ws['!cols'] = [
       { wch: 15 },
       ...ROLES_PERMITIDOS.map(r => ({ wch: Math.max(12, r.length + 2) }))
     ]
-    
+
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Tarifas')
     XLSX.writeFile(wb, 'Plantilla_Tarifas_Matriz.xlsx')
@@ -1039,11 +1041,11 @@ export default function SupervisorDashboard() {
                   .map(sz => (
                     <div key={sz} style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>{sz}</div>
-                      <input 
-                        type="number" min="0" className="modern-input" 
-                        style={{ padding: '8px 2px', textAlign: 'center', fontSize: '1rem' }} 
-                        value={sizeMap[sz]} 
-                        onChange={e => setSizeMap({...sizeMap, [sz]: e.target.value})} 
+                      <input
+                        type="number" min="0" className="modern-input"
+                        style={{ padding: '8px 2px', textAlign: 'center', fontSize: '1rem' }}
+                        value={sizeMap[sz]}
+                        onChange={e => setSizeMap({ ...sizeMap, [sz]: e.target.value })}
                       />
                     </div>
                   ))}
@@ -1070,12 +1072,12 @@ export default function SupervisorDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2>Órdenes Activas</h2>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button 
-                  className="btn-primary" 
+                <button
+                  className="btn-primary"
                   disabled={selectedForPrint.size === 0}
-                  style={{ 
-                    opacity: selectedForPrint.size === 0 ? 0.5 : 1, 
-                    padding: '8px 16px', 
+                  style={{
+                    opacity: selectedForPrint.size === 0 ? 0.5 : 1,
+                    padding: '8px 16px',
                     fontSize: '0.9rem',
                     cursor: selectedForPrint.size === 0 ? 'not-allowed' : 'pointer'
                   }}
@@ -1085,12 +1087,12 @@ export default function SupervisorDashboard() {
                 >
                   🖨️ Imprimir Hojas de Ruta ({selectedForPrint.size})
                 </button>
-                <button 
-                  className="btn-primary" 
+                <button
+                  className="btn-primary"
                   disabled={selectedForPrint.size === 0}
-                  style={{ 
-                    opacity: selectedForPrint.size === 0 ? 0.5 : 1, 
-                    padding: '8px 16px', 
+                  style={{
+                    opacity: selectedForPrint.size === 0 ? 0.5 : 1,
+                    padding: '8px 16px',
                     fontSize: '0.9rem',
                     background: 'rgba(239, 68, 68, 0.15)',
                     border: '1px solid rgba(239, 68, 68, 0.4)',
@@ -1110,8 +1112,8 @@ export default function SupervisorDashboard() {
                   <thead>
                     <tr>
                       <th style={{ width: '40px', textAlign: 'center' }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={orders.length > 0 && selectedForPrint.size === orders.length}
                           onChange={(e) => {
                             if (e.target.checked) {
@@ -1130,8 +1132,8 @@ export default function SupervisorDashboard() {
                     {orders.map((o: any) => (
                       <tr key={o.id}>
                         <td style={{ textAlign: 'center' }}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={selectedForPrint.has(o.id)}
                             onChange={(e) => {
                               const newSet = new Set(selectedForPrint)
@@ -1225,12 +1227,12 @@ export default function SupervisorDashboard() {
                 }}>
                   🖨️ Imprimir Carnets
                 </button>
-                <button 
-                  className="btn-primary" 
+                <button
+                  className="btn-primary"
                   disabled={selectedOperarios.size === 0}
-                  style={{ 
-                    opacity: selectedOperarios.size === 0 ? 0.5 : 1, 
-                    padding: '8px 16px', 
+                  style={{
+                    opacity: selectedOperarios.size === 0 ? 0.5 : 1,
+                    padding: '8px 16px',
                     fontSize: '0.9rem',
                     background: 'rgba(239, 68, 68, 0.15)',
                     border: '1px solid rgba(239, 68, 68, 0.4)',
@@ -1249,8 +1251,8 @@ export default function SupervisorDashboard() {
                 <thead>
                   <tr>
                     <th style={{ width: '40px', textAlign: 'center' }}>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={operarios.length > 0 && selectedOperarios.size === operarios.length}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -1269,8 +1271,8 @@ export default function SupervisorDashboard() {
                   {operarios.map(o => (
                     <tr key={o.id}>
                       <td style={{ textAlign: 'center' }}>
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={selectedOperarios.has(o.id)}
                           onChange={(e) => {
                             const newSet = new Set(selectedOperarios)
@@ -1396,8 +1398,8 @@ export default function SupervisorDashboard() {
                         background: dragOverProcesoIdx === idx && dragProcesoIdx !== idx
                           ? 'rgba(59,130,246,0.15)'
                           : dragProcesoIdx === idx
-                          ? 'rgba(255,255,255,0.04)'
-                          : undefined,
+                            ? 'rgba(255,255,255,0.04)'
+                            : undefined,
                         borderTop: dragOverProcesoIdx === idx && dragProcesoIdx !== idx && dragProcesoIdx !== null && dragProcesoIdx > idx
                           ? '2px solid #3b82f6'
                           : undefined,
@@ -1452,7 +1454,7 @@ export default function SupervisorDashboard() {
               <h2>💰 Precio por Referencia</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
                 Cada referencia de calzado puede tener un precio diferente por proceso.
-                Esta tarifa tiene <strong style={{color:'white'}}>prioridad</strong> sobre la tarifa global.
+                Esta tarifa tiene <strong style={{ color: 'white' }}>prioridad</strong> sobre la tarifa global.
               </p>
               <form onSubmit={handleGuardarTarifaRef}>
                 <label className="modern-label">Referencia de calzado
@@ -1465,20 +1467,20 @@ export default function SupervisorDashboard() {
 
                 <div style={{ marginTop: '1.5rem', marginBottom: '0.5rem', fontWeight: 600, color: 'var(--accent-blue)' }}>Matriz de Precios por Proceso</div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.2rem' }}>Deja en blanco los que no apliquen o ingresa un precio GLOBAL.</p>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
                   <label className="modern-label" style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span style={{color: 'var(--accent-green)'}}>GLOBAL</span>
-                    <input type="number" className="modern-input" value={tPreciosRol['GLOBAL'] || ''} 
-                           onChange={e => setTPreciosRol(prev => ({...prev, 'GLOBAL': e.target.value}))}
-                           placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
+                    <span style={{ color: 'var(--accent-green)' }}>GLOBAL</span>
+                    <input type="number" className="modern-input" value={tPreciosRol['GLOBAL'] || ''}
+                      onChange={e => setTPreciosRol(prev => ({ ...prev, 'GLOBAL': e.target.value }))}
+                      placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
                   </label>
                   {ROLES_PERMITIDOS.map(rol => (
                     <label key={rol} className="modern-label" style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                       {rol}
-                      <input type="number" className="modern-input" value={tPreciosRol[rol] || ''} 
-                             onChange={e => setTPreciosRol(prev => ({...prev, [rol]: e.target.value}))}
-                             placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
+                      <input type="number" className="modern-input" value={tPreciosRol[rol] || ''}
+                        onChange={e => setTPreciosRol(prev => ({ ...prev, [rol]: e.target.value }))}
+                        placeholder="$ 0" min={0} step={1} style={{ marginTop: '5px', padding: '6px' }} />
                     </label>
                   ))}
                 </div>
@@ -1493,7 +1495,7 @@ export default function SupervisorDashboard() {
                 <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>📥</div>
                 <div style={{ fontWeight: 'bold', fontSize: '0.98rem', marginBottom: '6px', color: 'white' }}>Importar Tarifas Masivamente</div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px', lineHeight: '1.5', maxWidth: '380px', margin: '0 auto 16px' }}>
-                  Carga un archivo Excel (.xlsx, .xls) con formato de matriz: columna A <strong style={{color:'white'}}>&quot;Referencia&quot;</strong> y columnas siguientes con los nombres de procesos (ej. Picado, Montado, etc.).
+                  Carga un archivo Excel (.xlsx, .xls) con formato de matriz: columna A <strong style={{ color: 'white' }}>&quot;Referencia&quot;</strong> y columnas siguientes con los nombres de procesos (ej. Picado, Montado, etc.).
                 </p>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <input type="file" accept=".xlsx, .xls" onChange={handleImportExcelTarifas} style={{ display: 'none' }} id="excel-import-tarifas-input" />
@@ -1520,8 +1522,8 @@ export default function SupervisorDashboard() {
                 <h2 style={{ margin: 0 }}>Tarifas por Referencia (Agrupadas)</h2>
                 {allGroupedRefs.length > 0 && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={allGroupedRefs.length > 0 && allGroupedRefs.every(ref => selectedRefsForDeletion.includes(ref))}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -1561,23 +1563,23 @@ export default function SupervisorDashboard() {
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '10px' }} className="custom-scrollbar">
                 {tarifasRef.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px' }}>Sin tarifas por referencia.</div>}
-                
+
                 {Object.entries(tarifasRef.reduce((acc: any, t: TarifaRef) => {
                   if (!acc[t.referencia]) acc[t.referencia] = [];
                   acc[t.referencia].push(t);
                   return acc;
                 }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([ref, tarifas]: [string, any]) => (
-                  <div key={ref} className="glass-card" style={{ 
-                    padding: '1.2rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1.5rem', 
+                  <div key={ref} className="glass-card" style={{
+                    padding: '1.2rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1.5rem',
                     background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)',
                     transition: 'all 0.3s', cursor: 'default'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}>
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '180px' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedRefsForDeletion.includes(ref)} 
+                      <input
+                        type="checkbox"
+                        checked={selectedRefsForDeletion.includes(ref)}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setSelectedRefsForDeletion(prev => [...prev, ref])
@@ -1585,7 +1587,7 @@ export default function SupervisorDashboard() {
                             setSelectedRefsForDeletion(prev => prev.filter(r => r !== ref))
                           }
                         }}
-                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }} 
+                        style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }}
                       />
                       <div style={{ background: 'linear-gradient(135deg, var(--accent-blue), #2563eb)', color: 'white', fontWeight: 'bold', padding: '8px 16px', borderRadius: '8px', fontSize: '1.1rem', boxShadow: '0 4px 10px rgba(59,130,246,0.3)' }}>
                         {ref}
@@ -1605,21 +1607,21 @@ export default function SupervisorDashboard() {
                         ✏️ Editar
                       </button>
                     </div>
-                    
+
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', flex: 1 }}>
                       {tarifas.sort((a: any, b: any) => a.rol.localeCompare(b.rol)).map((t: any) => (
-                        <div key={t.id} style={{ 
-                          display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.4)', 
-                          borderRadius: '20px', padding: '4px 6px 4px 14px', border: '1px solid rgba(255,255,255,0.08)' 
+                        <div key={t.id} style={{
+                          display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.4)',
+                          borderRadius: '20px', padding: '4px 6px 4px 14px', border: '1px solid rgba(255,255,255,0.08)'
                         }}>
                           <span style={{ color: 'var(--text-secondary)', marginRight: '8px', fontSize: '0.85rem', fontWeight: 500 }}>{t.rol}</span>
                           <strong style={{ color: 'var(--accent-green)', marginRight: '10px' }}>${t.precio_por_par.toLocaleString()}</strong>
-                          <button onClick={() => handleEliminarTarifaRef(t.id, t.referencia, t.rol)} 
-                            style={{ 
-                              background: 'rgba(239,68,68,0.15)', border: 'none', color: '#f87171', width: '26px', height: '26px', 
-                              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', 
-                              fontSize: '1.1rem', transition: 'all 0.2s' 
-                            }} 
+                          <button onClick={() => handleEliminarTarifaRef(t.id, t.referencia, t.rol)}
+                            style={{
+                              background: 'rgba(239,68,68,0.15)', border: 'none', color: '#f87171', width: '26px', height: '26px',
+                              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                              fontSize: '1.1rem', transition: 'all 0.2s'
+                            }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white' }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.color = '#f87171' }}
                             title={`Eliminar ${t.rol} de ${ref}`}>×</button>
@@ -1637,7 +1639,7 @@ export default function SupervisorDashboard() {
             <div className="glass-card" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
               <h2>🌐 Tarifa Global por Rol</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
-                Se aplica cuando <strong style={{color:'white'}}>no existe</strong> una tarifa específica para la referencia.
+                Se aplica cuando <strong style={{ color: 'white' }}>no existe</strong> una tarifa específica para la referencia.
               </p>
               <form onSubmit={handleGuardarTarifaGlobal}>
                 <label className="modern-label">Rol / Proceso
@@ -1751,113 +1753,113 @@ export default function SupervisorDashboard() {
           const ws = XLSX.utils.json_to_sheet(filas)
           const wb = XLSX.utils.book_new()
           XLSX.utils.book_append_sheet(wb, ws, 'Guía')
-          XLSX.writeFile(wb, `guia_produccion_${guiaFiltroEstado}_${new Date().toISOString().slice(0,10)}.xlsx`)
+          XLSX.writeFile(wb, `guia_produccion_${guiaFiltroEstado}_${new Date().toISOString().slice(0, 10)}.xlsx`)
         }
 
         return (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <h2 style={{ margin: 0 }}>📋 Guía de Producción por Orden</h2>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <select
-                className="modern-input" style={{ width: 'auto', padding: '8px 12px' }}
-                value={guiaFiltroEstado}
-                onChange={e => {
-                  const v = e.target.value as 'activas' | 'completadas' | 'todas'
-                  setGuiaFiltroEstado(v); fetchGuia(v)
-                }}
-              >
-                <option value="activas">En progreso</option>
-                <option value="completadas">Completadas</option>
-                <option value="todas">Todas</option>
-              </select>
-              <button onClick={() => fetchGuia(guiaFiltroEstado)} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.9rem' }}>🔄</button>
-              <button
-                onClick={handleExportGuiaExcel}
-                className="btn-primary"
-                style={{ background: 'var(--accent-green)', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                📊 Excel
-              </button>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h2 style={{ margin: 0 }}>📋 Guía de Producción por Orden</h2>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <select
+                  className="modern-input" style={{ width: 'auto', padding: '8px 12px' }}
+                  value={guiaFiltroEstado}
+                  onChange={e => {
+                    const v = e.target.value as 'activas' | 'completadas' | 'todas'
+                    setGuiaFiltroEstado(v); fetchGuia(v)
+                  }}
+                >
+                  <option value="activas">En progreso</option>
+                  <option value="completadas">Completadas</option>
+                  <option value="todas">Todas</option>
+                </select>
+                <button onClick={() => fetchGuia(guiaFiltroEstado)} className="btn-primary" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.9rem' }}>🔄</button>
+                <button
+                  onClick={handleExportGuiaExcel}
+                  className="btn-primary"
+                  style={{ background: 'var(--accent-green)', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  📊 Excel
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table className="modern-table" style={{ minWidth: '800px' }}>
-              <thead>
-                <tr>
-                  <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: '80px' }}>Orden</th>
-                  <th style={{ minWidth: '90px' }}>Referencia</th>
-                  <th style={{ minWidth: '80px' }}>Color</th>
-                  <th style={{ minWidth: '60px' }}>Pares</th>
-                  {guia.columnas.map(col => (
-                    <th key={col} style={{ minWidth: '90px', textAlign: 'center', fontSize: '0.78rem', whiteSpace: 'nowrap', padding: '10px 8px' }}>{col}</th>
-                  ))}
-                  <th style={{ minWidth: '120px', textAlign: 'center' }}>Completada</th>
-                </tr>
-              </thead>
-              <tbody>
-                {guia.filas.length === 0 && (
-                  <tr><td colSpan={5 + guia.columnas.length} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Sin órdenes para mostrar.</td></tr>
-                )}
-                {guia.filas.map((fila: any) => {
-                  const totalProcesos = guia.columnas.length
-                  const completados = guia.columnas.filter(c => fila.procesos?.[c]).length
-                  const porcentaje = totalProcesos > 0 ? Math.round((completados / totalProcesos) * 100) : 0
-                  return (
-                    <tr key={fila.orden_id}>
-                      <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                        {fila.orden_id}
-                      </td>
-                      <td style={{ fontWeight: 600, color: 'white' }}>{fila.referencia}</td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{fila.color}</td>
-                      <td style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>{fila.total_pares}</td>
-                      {guia.columnas.map(col => (
-                        <td key={col} style={{ textAlign: 'center' }}>
-                          {fila.procesos?.[col]
-                            ? <span style={{ fontSize: '1.3rem' }} title={col}>✅</span>
-                            : <span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.15)' }}>—</span>
-                          }
+            <div style={{ overflowX: 'auto' }}>
+              <table className="modern-table" style={{ minWidth: '800px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: '80px' }}>Orden</th>
+                    <th style={{ minWidth: '90px' }}>Referencia</th>
+                    <th style={{ minWidth: '80px' }}>Color</th>
+                    <th style={{ minWidth: '60px' }}>Pares</th>
+                    {guia.columnas.map(col => (
+                      <th key={col} style={{ minWidth: '90px', textAlign: 'center', fontSize: '0.78rem', whiteSpace: 'nowrap', padding: '10px 8px' }}>{col}</th>
+                    ))}
+                    <th style={{ minWidth: '120px', textAlign: 'center' }}>Completada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guia.filas.length === 0 && (
+                    <tr><td colSpan={5 + guia.columnas.length} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem' }}>Sin órdenes para mostrar.</td></tr>
+                  )}
+                  {guia.filas.map((fila: any) => {
+                    const totalProcesos = guia.columnas.length
+                    const completados = guia.columnas.filter(c => fila.procesos?.[c]).length
+                    const porcentaje = totalProcesos > 0 ? Math.round((completados / totalProcesos) * 100) : 0
+                    return (
+                      <tr key={fila.orden_id}>
+                        <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                          {fila.orden_id}
                         </td>
-                      ))}
-                      <td style={{ textAlign: 'center' }}>
-                        {fila.fecha_completado ? (
-                          <div>
-                            <div style={{ color: 'var(--accent-green)', fontWeight: 700, fontSize: '0.8rem' }}>
-                              ✅ {new Date(fila.fecha_completado).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        <td style={{ fontWeight: 600, color: 'white' }}>{fila.referencia}</td>
+                        <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{fila.color}</td>
+                        <td style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>{fila.total_pares}</td>
+                        {guia.columnas.map(col => (
+                          <td key={col} style={{ textAlign: 'center' }}>
+                            {fila.procesos?.[col]
+                              ? <span style={{ fontSize: '1.3rem' }} title={col}>✅</span>
+                              : <span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.15)' }}>—</span>
+                            }
+                          </td>
+                        ))}
+                        <td style={{ textAlign: 'center' }}>
+                          {fila.fecha_completado ? (
+                            <div>
+                              <div style={{ color: 'var(--accent-green)', fontWeight: 700, fontSize: '0.8rem' }}>
+                                ✅ {new Date(fila.fecha_completado).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                              </div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                                {new Date(fila.fecha_completado).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
                             </div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
-                              {new Date(fila.fecha_completado).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          ) : (
+                            <div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)', fontWeight: 600 }}>{porcentaje}%</div>
+                              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '4px', height: '4px', marginTop: '4px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${porcentaje}%`, background: 'var(--accent-blue)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)', fontWeight: 600 }}>{porcentaje}%</div>
-                            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '4px', height: '4px', marginTop: '4px', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${porcentaje}%`, background: 'var(--accent-blue)', borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ padding: '8px 16px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.85rem', color: 'var(--accent-green)' }}>
-              ✅ = Proceso completado
-            </div>
-            <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              — = Pendiente
-            </div>
-            <div style={{ padding: '8px 16px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '0.85rem', color: 'var(--accent-blue)' }}>
-              Las columnas se actualizan automáticamente al agregar procesos desde la pestaña Procesos.
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 16px', background: 'rgba(16,185,129,0.1)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.85rem', color: 'var(--accent-green)' }}>
+                ✅ = Proceso completado
+              </div>
+              <div style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                — = Pendiente
+              </div>
+              <div style={{ padding: '8px 16px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '0.85rem', color: 'var(--accent-blue)' }}>
+                Las columnas se actualizan automáticamente al agregar procesos desde la pestaña Procesos.
+              </div>
             </div>
           </div>
-        </div>
         )
       })()}
 
@@ -2036,8 +2038,18 @@ export default function SupervisorDashboard() {
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
               />
+              <select
+                className="modern-input"
+                style={{ width: 'auto', padding: '8px 12px' }}
+                value={payrollQuincena}
+                onChange={(e) => setPayrollQuincena(e.target.value as any)}
+              >
+                <option value="MES">Mes completo</option>
+                <option value="Q1">Quincena 1 (1-15)</option>
+                <option value="Q2">Quincena 2 (16-final)</option>
+              </select>
               <button
-                onClick={() => window.open(`/imprimir/nomina?mes=${selectedMonth}`, '_blank')}
+                onClick={() => window.open(`/imprimir/nomina?mes=${selectedMonth}&quincena=${payrollQuincena}`, '_blank')}
                 className="btn-export-pdf"
               >
                 Exportar PDF
@@ -2126,7 +2138,7 @@ export default function SupervisorDashboard() {
                 <select className="modern-input" style={{ width: 'auto', padding: '8px 12px' }}
                   value={bitacoraFiltroTipo} onChange={e => setBitacoraFiltroTipo(e.target.value)}>
                   <option value="">Todos los eventos</option>
-                  {['ORDEN','PRODUCCION','OPERARIO','TARIFA','PROCESO','AVANCE'].map(t => (
+                  {['ORDEN', 'PRODUCCION', 'OPERARIO', 'TARIFA', 'PROCESO', 'AVANCE'].map(t => (
                     <option key={t} value={t}>{TIPO_ICONS[t]} {t}</option>
                   ))}
                 </select>
