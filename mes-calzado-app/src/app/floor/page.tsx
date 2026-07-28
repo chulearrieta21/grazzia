@@ -35,7 +35,8 @@ export default function FloorTerminal() {
   const [userQr, setUserQr] = useState('')
   const [batchId, setBatchId] = useState('')
   const [operator, setOperator] = useState<Operario | null>(null)
-  
+  const [operatorNomina, setOperatorNomina] = useState<any>(null)
+
   const [message, setMessage] = useState({ type: '', text: '' })
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<StatsNotification | null>(null)
@@ -118,6 +119,16 @@ export default function FloorTerminal() {
           triggerStats(opNombre, opRol, data.resumen)
         }
 
+        try {
+          const resNom = await fetch(`${API}/nomina`)
+          const nominaData = await resNom.json()
+          if (Array.isArray(nominaData)) {
+            const opIdStr = data.operario?.id ? String(data.operario.id) : String(data.operario)
+            const myNomina = nominaData.find(n => n.userId === opIdStr)
+            setOperatorNomina(myNomina)
+          }
+        } catch { }
+
         if (data.tipo_pago === 'por_dia') {
           setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
           setUserQr('')
@@ -145,7 +156,7 @@ export default function FloorTerminal() {
       const res = await fetch(`${API}/produccion/registrar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           qr_operario: operator?.codigo_qr,
           qr_orden: batch
         })
@@ -166,9 +177,19 @@ export default function FloorTerminal() {
           triggerStats(opNombre, opRol, data.resumen)
         }
 
-        setMessage({ 
-          type: 'success', 
-          text: `¡Éxito! ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}` 
+        try {
+          const resNom = await fetch(`${API}/nomina`)
+          const nominaData = await resNom.json()
+          if (Array.isArray(nominaData)) {
+            const opIdStr = operator?.id ? String(operator.id) : ''
+            const myNomina = nominaData.find(n => n.userId === opIdStr)
+            setOperatorNomina(myNomina)
+          }
+        } catch { }
+
+        setMessage({
+          type: 'success',
+          text: `¡Éxito! ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}`
         })
         setUserQr('')
         setBatchId('')
@@ -232,123 +253,168 @@ export default function FloorTerminal() {
     setUserQr('')
     setBatchId('')
     setOperator(null)
+    setOperatorNomina(null)
     setMessage({ type: '', text: '' })
     setTimeout(() => userQrRef.current?.focus(), 50)
   }
 
   return (
     <div className="terminal-container">
-      {/* ── Banner Flotante de Producción y Nómina ────────────────────────── */}
-      {stats && (
-        <div className="floating-stats-banner">
-          <div className="stats-banner-header">
-            <div className="stats-user-badge">
-              <span className="stats-user-icon">👤</span>
-              <div>
-                <span className="stats-user-name">{stats.operarioNombre}</span>
-                <span className="stats-user-role">({stats.operarioRol})</span>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '1200px' }}>
+
+        {/* Panel izquierdo: Nómina del Operario */}
+        {operator && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: '1', minWidth: '350px', maxWidth: '450px' }}>
+            <div className="glass-card" style={{ padding: '20px', borderColor: 'var(--accent-blue)' }}>
+
+              {/* Cabecera / Identidad */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '2.5rem' }}>👤</div>
+                <div>
+                  <h2 style={{ margin: 0, color: 'white', fontSize: '1.2rem', textTransform: 'uppercase' }}>{stats?.operarioNombre || operator.nombre}</h2>
+                  <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold' }}>{stats?.operarioRol || operator.rol}</span>
+                </div>
               </div>
-            </div>
-            <div className="stats-live-tag">⚡ PRODUCCIÓN Y NÓMINA</div>
-          </div>
 
-          <div className="stats-grid">
-            <div className="stat-card stat-today">
-              <div className="stat-label">Producción de Hoy</div>
-              <div className="stat-value">{stats.resumen.pares_hoy} <span className="stat-unit">prs</span></div>
-              <div className="stat-subtext">${stats.resumen.ganado_hoy?.toLocaleString()} COP hoy</div>
+              {/* Stats Hoy y Semana (Antes Flotantes) */}
+              {stats && (
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '15px', borderRadius: '10px', borderLeft: '3px solid var(--accent-blue)' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>PRODUCCIÓN HOY</div>
+                    <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 800 }}>{stats.resumen.pares_hoy} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>prs</span></div>
+                    <div style={{ color: 'var(--accent-green)', fontSize: '1rem', fontWeight: 'bold', marginTop: '4px' }}>${stats.resumen.ganado_hoy?.toLocaleString()} COP</div>
+                  </div>
+
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '15px', borderRadius: '10px', borderLeft: '3px solid var(--accent-green)' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>ACUMULADO SEMANA</div>
+                    <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 800 }}>${stats.resumen.ganado_semana?.toLocaleString()} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>COP</span></div>
+                    <div style={{ color: 'var(--accent-blue)', fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px' }}>
+                      {stats.resumen.pares_semana > 0 ? `${stats.resumen.pares_semana} prs` : 'Por día'}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="stat-card stat-week">
-              <div className="stat-label">Nómina Acumulada Semana</div>
-              <div className="stat-value">${stats.resumen.ganado_semana?.toLocaleString()} <span className="stat-unit">COP</span></div>
-              <div className="stat-subtext">
-                {stats.resumen.pares_semana > 0 ? `${stats.resumen.pares_semana} pares acumulados` : 'Registro por día'}
+            {operatorNomina && (
+              <div className="glass-card" style={{ padding: '20px', borderColor: 'var(--accent-blue)' }}>
+                <h2 style={{ color: 'white', marginBottom: '15px', fontSize: '1.1rem', textTransform: 'uppercase' }}>
+                  📊 Detalle de Mes
+                </h2>
+                <div style={{ marginBottom: '20px' }}>
+                  {operatorNomina && operatorNomina.detalleReferencias && Object.entries(operatorNomina.detalleReferencias).map(([ref, det]: [string, any]) => (
+                    <div key={ref} style={{ marginBottom: '8px', padding: '12px 15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '4px solid var(--accent-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ color: 'white', fontWeight: 600, fontSize: '1.05rem' }}>{ref}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{det.proceso}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ color: 'var(--accent-yellow)', display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>{det.pares} pares</span>
+                        <span style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: '1.05rem' }}>${(Number(det.valor) || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {operatorNomina.processesCount?.['Horas Trabajadas'] ? (
+                    <div style={{ padding: '12px 15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '4px solid var(--accent-yellow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, fontSize: '1.05rem' }}>Jornales</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{operatorNomina.processesCount['Horas Trabajadas']}h trabajadas</span>
+                    </div>
+                  ) : null}
+                  {(!operatorNomina.detalleReferencias || Object.keys(operatorNomina.detalleReferencias).length === 0) && !operatorNomina.processesCount?.['Horas Trabajadas'] && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
+                      Aún no tienes registros de producción en este mes.
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px', fontWeight: 'bold' }}>
+                  <span style={{ color: 'var(--accent-yellow)', fontSize: '1.1rem' }}>Pares: {operatorNomina.totalPairs || 0}</span>
+                  <span style={{ color: 'var(--accent-green)', fontSize: '1.2rem' }}>Total: ${(Number(operatorNomina.totalEarned) || 0).toLocaleString()}</span>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="stats-progress-bar"></div>
-        </div>
-      )}
-
-      <div className="glass-card terminal-card" style={{maxWidth: '650px'}}>
-        <div className="terminal-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '60px', marginBottom: '1.5rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
-          <h1>Terminal de Operario</h1>
-          <p>Sistema de Escaneo Cero Digitación - GRAZZIA</p>
-        </div>
-        
-        {message.text && (
-          <div className={`alert ${message.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-            {message.type === 'error' ? '⚠️ ' : '✅ '}
-            {message.text}
+            )}
           </div>
         )}
 
-        {loading && <p style={{color: 'var(--accent-blue)', textAlign: 'center', marginBottom: '1rem'}}>Procesando...</p>}
+        {/* Panel derecho: Terminal Principal */}
+        <div className="glass-card terminal-card" style={{ flex: '2', minWidth: '350px', maxWidth: '650px' }}>
+          <div className="terminal-header">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '60px', marginBottom: '1.5rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
+            <h1>Terminal de Operario</h1>
+            <p>Sistema de Escaneo Cero Digitación - GRAZZIA</p>
+          </div>
 
-        <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
-          
-          <div style={{
-            background: operator ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.2)', 
-            padding: '20px', borderRadius: '12px', 
-            border: operator ? '1px solid var(--accent-green)' : '1px solid rgba(255,255,255,0.1)',
-            transition: 'all 0.3s'
-          }}>
-            <label className="modern-label" style={{textAlign: 'center', fontSize: '1.2rem', color: 'white'}}>
-              1. ESCANEA TU CÓDIGO DE OPERARIO (CARNET)
-              <input 
-                ref={userQrRef}
-                className="modern-input pin-input"
-                value={userQr} 
-                onChange={(e) => setUserQr(e.target.value)}
-                onKeyDown={handleUserQrKeyDown}
-                placeholder="Ej: EMP-001"
-                disabled={operator !== null || loading}
-                style={{
-                  marginTop: '10px',
-                  opacity: operator ? 0.7 : 1,
-                  borderColor: operator ? 'var(--accent-green)' : 'var(--border-color)'
-                }}
-              />
-            </label>
+          {message.text && (
+            <div className={`alert ${message.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+              {message.type === 'error' ? '⚠️ ' : '✅ '}
+              {message.text}
+            </div>
+          )}
+
+          {loading && <p style={{ color: 'var(--accent-blue)', textAlign: 'center', marginBottom: '1rem' }}>Procesando...</p>}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+            <div style={{
+              background: operator ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.2)',
+              padding: '20px', borderRadius: '12px',
+              border: operator ? '1px solid var(--accent-green)' : '1px solid rgba(255,255,255,0.1)',
+              transition: 'all 0.3s'
+            }}>
+              <label className="modern-label" style={{ textAlign: 'center', fontSize: '1.2rem', color: 'white' }}>
+                1. ESCANEA TU CÓDIGO DE OPERARIO (CARNET)
+                <input
+                  ref={userQrRef}
+                  className="modern-input pin-input"
+                  value={userQr}
+                  onChange={(e) => setUserQr(e.target.value)}
+                  onKeyDown={handleUserQrKeyDown}
+                  placeholder="Ej: EMP-001"
+                  disabled={operator !== null || loading}
+                  style={{
+                    marginTop: '10px',
+                    opacity: operator ? 0.7 : 1,
+                    borderColor: operator ? 'var(--accent-green)' : 'var(--border-color)'
+                  }}
+                />
+              </label>
+              {operator && (
+                <p style={{ color: 'var(--accent-green)', textAlign: 'center', marginTop: '10px', fontWeight: 'bold' }}>
+                  Operario detectado: {operator.nombre} ({operator.rol})
+                </p>
+              )}
+            </div>
+
+            <div style={{
+              background: !operator ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.2)',
+              padding: '20px', borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              opacity: !operator ? 0.5 : 1,
+              pointerEvents: !operator ? 'none' : 'auto',
+              transition: 'all 0.3s'
+            }}>
+              <label className="modern-label" style={{ textAlign: 'center', fontSize: '1.2rem', color: 'white' }}>
+                2. ESCANEA EL CÓDIGO DE LA CANASTA (ORDEN)
+                <input
+                  ref={batchIdRef}
+                  className="modern-input pin-input"
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  onKeyDown={handleBatchIdKeyDown}
+                  placeholder="Ej: OP-0462"
+                  disabled={!operator || loading}
+                  style={{ borderColor: 'var(--accent-blue)', marginTop: '10px' }}
+                />
+              </label>
+            </div>
+
             {operator && (
-              <p style={{color: 'var(--accent-green)', textAlign: 'center', marginTop: '10px', fontWeight: 'bold'}}>
-                Operario detectado: {operator.nombre} ({operator.rol})
-              </p>
+              <button onClick={resetTerminal} className="btn-primary" style={{ marginTop: '1rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)' }}>
+                Cancelar Operación
+              </button>
             )}
           </div>
-
-          <div style={{
-            background: !operator ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.2)', 
-            padding: '20px', borderRadius: '12px', 
-            border: '1px solid rgba(255,255,255,0.1)',
-            opacity: !operator ? 0.5 : 1,
-            pointerEvents: !operator ? 'none' : 'auto',
-            transition: 'all 0.3s'
-          }}>
-            <label className="modern-label" style={{textAlign: 'center', fontSize: '1.2rem', color: 'white'}}>
-              2. ESCANEA EL CÓDIGO DE LA CANASTA (ORDEN)
-              <input 
-                ref={batchIdRef}
-                className="modern-input pin-input"
-                value={batchId} 
-                onChange={(e) => setBatchId(e.target.value)}
-                onKeyDown={handleBatchIdKeyDown}
-                placeholder="Ej: OP-0462"
-                disabled={!operator || loading}
-                style={{borderColor: 'var(--accent-blue)', marginTop: '10px'}}
-              />
-            </label>
-          </div>
-
-          {operator && (
-            <button onClick={resetTerminal} className="btn-primary" style={{marginTop: '1rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)'}}>
-              Cancelar Operación
-            </button>
-          )}
         </div>
       </div>
     </div>

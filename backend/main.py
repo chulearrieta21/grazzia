@@ -650,7 +650,10 @@ def calcular_nomina():
             }
 
         # 1. Destajo (Producción)
-        producciones = db.query(models.Produccion).filter(
+        producciones = db.query(models.Produccion).options(
+            joinedload(models.Produccion.operario),
+            joinedload(models.Produccion.lote).joinedload(models.Lote.orden)
+        ).filter(
             models.Produccion.fecha_registro >= start_date,
             models.Produccion.fecha_registro < end_date
         ).all()
