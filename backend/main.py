@@ -646,8 +646,15 @@ def calcular_nomina():
             nomina_dict[user_id] = {
                 "userId": user_id, "name": o.nombre,
                 "totalPairs": 0, "totalEarned": 0.0, "processesCount": {},
-                "totalAdvances": 0.0, "netEarned": 0.0
+                "totalAdvances": 0.0, "netEarned": 0.0,
+                "detalleReferenciasSemanaActual": {},
+                "resumenSemanasAnteriores": {"pares": 0, "valor": 0.0}
             }
+
+        # Calcular inicio de la semana actual en Colombia (Lunes)
+        c_now = colombia_now()
+        hoy_inicio = datetime(c_now.year, c_now.month, c_now.day)
+        lunes_actual = hoy_inicio - timedelta(days=hoy_inicio.weekday())
 
         # 1. Destajo (Producción)
         producciones = db.query(models.Produccion).options(
@@ -668,12 +675,13 @@ def calcular_nomina():
                 proceso = p.proceso_realizado
                 record["processesCount"][proceso] = record["processesCount"].get(proceso, 0) + p.pares_realizados
                 
-                # Detalle por referencia
+                # Detalle por referencia (mes completo)
                 orden = p.lote.orden if p.lote else None
                 ref = orden.referencia if orden else "Sin referencia"
                 color = orden.color if orden else ""
                 orden_id = orden.id if orden else ""
-                ref_key = f"{ref} ({color})"
+                ref_key = f"{ref} ({color})" if color else ref
+
                 if "detalleReferencias" not in record:
                     record["detalleReferencias"] = {}
                 if ref_key not in record["detalleReferencias"]:
@@ -681,6 +689,17 @@ def calcular_nomina():
                 record["detalleReferencias"][ref_key]["pares"] += p.pares_realizados
                 record["detalleReferencias"][ref_key]["valor"] += p.valor_pagar
                 record["detalleReferencias"][ref_key]["ordenes"].add(orden_id)
+
+                # Clasificación por Semana Actual vs Semanas Anteriores
+                if p.fecha_registro >= lunes_actual:
+                    if ref_key not in record["detalleReferenciasSemanaActual"]:
+                        record["detalleReferenciasSemanaActual"][ref_key] = {"pares": 0, "valor": 0.0, "ordenes": set(), "proceso": proceso}
+                    record["detalleReferenciasSemanaActual"][ref_key]["pares"] += p.pares_realizados
+                    record["detalleReferenciasSemanaActual"][ref_key]["valor"] += p.valor_pagar
+                    record["detalleReferenciasSemanaActual"][ref_key]["ordenes"].add(orden_id)
+                else:
+                    record["resumenSemanasAnteriores"]["pares"] += p.pares_realizados
+                    record["resumenSemanasAnteriores"]["valor"] += p.valor_pagar
 
         # 2. Por día (Jornales)
         jornadas = db.query(models.RegistroJornada).filter(
@@ -734,6 +753,9 @@ def calcular_nomina():
             # Convertir sets a listas para que sean JSON-serializable
             if "detalleReferencias" in record:
                 for ref_key, det in record["detalleReferencias"].items():
+                    det["ordenes"] = list(det["ordenes"])
+            if "detalleReferenciasSemanaActual" in record:
+                for ref_key, det in record["detalleReferenciasSemanaActual"].items():
                     det["ordenes"] = list(det["ordenes"])
             
             # Solo incluir si hay actividad en el mes

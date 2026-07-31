@@ -21,6 +21,15 @@
   padding: 0;
 }
 
+/* Ocultar barra de desplazamiento manteniendo funcionalidad de scroll */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari y Opera */
+}
+
 body {
   background-color: var(--bg-primary);
   background-image: 

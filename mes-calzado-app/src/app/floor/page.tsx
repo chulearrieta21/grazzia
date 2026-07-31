@@ -262,77 +262,111 @@ export default function FloorTerminal() {
     <div className="terminal-container">
       <div style={{ display: 'flex', flexDirection: 'row', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '1200px' }}>
 
-        {/* Panel izquierdo: Nómina del Operario */}
+        {/* Panel izquierdo: Nómina del Operario (2 Tarjetas Compactas) */}
         {operator && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: '1', minWidth: '350px', maxWidth: '450px' }}>
-            <div className="glass-card" style={{ padding: '20px', borderColor: 'var(--accent-blue)' }}>
-
-              {/* Cabecera / Identidad */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', paddingBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                <div style={{ fontSize: '2.5rem' }}>👤</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: '1', minWidth: '340px', maxWidth: '440px' }}>
+            
+            {/* Cabecera / Identidad del Operario */}
+            <div className="glass-card" style={{ padding: '15px 20px', borderColor: 'var(--accent-blue)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{ fontSize: '2.2rem' }}>👤</div>
                 <div>
-                  <h2 style={{ margin: 0, color: 'white', fontSize: '1.2rem', textTransform: 'uppercase' }}>{stats?.operarioNombre || operator.nombre}</h2>
-                  <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold' }}>{stats?.operarioRol || operator.rol}</span>
+                  <h2 style={{ margin: 0, color: 'white', fontSize: '1.15rem', textTransform: 'uppercase' }}>{stats?.operarioNombre || operator.nombre}</h2>
+                  <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold', fontSize: '0.95rem' }}>{stats?.operarioRol || operator.rol}</span>
                 </div>
               </div>
-
-              {/* Stats Hoy y Semana (Antes Flotantes) */}
-              {stats && (
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '15px', borderRadius: '10px', borderLeft: '3px solid var(--accent-blue)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>PRODUCCIÓN HOY</div>
-                    <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 800 }}>{stats.resumen.pares_hoy} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>prs</span></div>
-                    <div style={{ color: 'var(--accent-green)', fontSize: '1rem', fontWeight: 'bold', marginTop: '4px' }}>${stats.resumen.ganado_hoy?.toLocaleString()} COP</div>
-                  </div>
-
-                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', padding: '15px', borderRadius: '10px', borderLeft: '3px solid var(--accent-green)' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>ACUMULADO SEMANA</div>
-                    <div style={{ color: 'white', fontSize: '1.4rem', fontWeight: 800 }}>${stats.resumen.ganado_semana?.toLocaleString()} <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>COP</span></div>
-                    <div style={{ color: 'var(--accent-blue)', fontSize: '0.9rem', fontWeight: 'bold', marginTop: '4px' }}>
-                      {stats.resumen.pares_semana > 0 ? `${stats.resumen.pares_semana} prs` : 'Por día'}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {operatorNomina && (
-              <div className="glass-card" style={{ padding: '20px', borderColor: 'var(--accent-blue)' }}>
-                <h2 style={{ color: 'white', marginBottom: '15px', fontSize: '1.1rem', textTransform: 'uppercase' }}>
-                  📊 Detalle de Mes
-                </h2>
-                <div style={{ marginBottom: '20px' }}>
-                  {operatorNomina && operatorNomina.detalleReferencias && Object.entries(operatorNomina.detalleReferencias).map(([ref, det]: [string, any]) => (
-                    <div key={ref} style={{ marginBottom: '8px', padding: '12px 15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '4px solid var(--accent-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ color: 'white', fontWeight: 600, fontSize: '1.05rem' }}>{ref}</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{det.proceso}</span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ color: 'var(--accent-yellow)', display: 'block', marginBottom: '4px', fontSize: '0.9rem' }}>{det.pares} pares</span>
-                        <span style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: '1.05rem' }}>${(Number(det.valor) || 0).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {operatorNomina.processesCount?.['Horas Trabajadas'] ? (
-                    <div style={{ padding: '12px 15px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', borderLeft: '4px solid var(--accent-yellow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, fontSize: '1.05rem' }}>Jornales</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{operatorNomina.processesCount['Horas Trabajadas']}h trabajadas</span>
-                    </div>
-                  ) : null}
-                  {(!operatorNomina.detalleReferencias || Object.keys(operatorNomina.detalleReferencias).length === 0) && !operatorNomina.processesCount?.['Horas Trabajadas'] && (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
-                      Aún no tienes registros de producción en este mes.
-                    </div>
-                  )}
+            {/* TARJETA 1: Semana Actual */}
+            <div className="glass-card" style={{ padding: '16px', borderColor: 'var(--accent-blue)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, color: 'white', fontSize: '1.05rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🗓️ Semana Actual
+                </h3>
+                <span style={{ color: 'var(--accent-green)', fontWeight: 800, fontSize: '1.1rem' }}>
+                  ${((stats?.resumen?.ganado_semana ?? 0)).toLocaleString()} COP
+                </span>
+              </div>
+
+              {/* Indicadores Hoy vs Semana */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>PRODUCCIÓN HOY</div>
+                  <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 800 }}>
+                    {stats?.resumen?.pares_hoy ?? 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>prs</span>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px', fontWeight: 'bold' }}>
-                  <span style={{ color: 'var(--accent-yellow)', fontSize: '1.1rem' }}>Pares: {operatorNomina.totalPairs || 0}</span>
-                  <span style={{ color: 'var(--accent-green)', fontSize: '1.2rem' }}>Total: ${(Number(operatorNomina.totalEarned) || 0).toLocaleString()}</span>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', padding: '8px 12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-green)' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>PARES SEMANA</div>
+                  <div style={{ color: 'white', fontSize: '1.1rem', fontWeight: 800 }}>
+                    {stats?.resumen?.pares_semana ?? 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>prs</span>
+                  </div>
                 </div>
               </div>
-            )}
+
+              {/* Contenedor compacto con scroll interno de la Semana Actual */}
+              <div className="hide-scrollbar" style={{ maxHeight: '140px', overflowY: 'auto', paddingRight: '4px' }}>
+                {operatorNomina?.detalleReferenciasSemanaActual && Object.keys(operatorNomina.detalleReferenciasSemanaActual).length > 0 ? (
+                  Object.entries(operatorNomina.detalleReferenciasSemanaActual).map(([ref, det]: [string, any]) => (
+                    <div key={ref} style={{ marginBottom: '6px', padding: '8px 12px', background: 'rgba(0,0,0,0.25)', borderRadius: '6px', borderLeft: '3px solid var(--accent-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{ref}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{det.proceso}</span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ color: 'var(--accent-yellow)', display: 'block', fontSize: '0.8rem' }}>{det.pares} prs</span>
+                        <span style={{ color: 'var(--accent-green)', fontWeight: 600, fontSize: '0.9rem' }}>${(Number(det.valor) || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '0.8rem 0', fontSize: '0.85rem' }}>
+                    Sin detalle de referencias en la semana actual.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* TARJETA 2: Resumen del Mes */}
+            <div className="glass-card" style={{ padding: '16px', borderColor: 'var(--accent-yellow)' }}>
+              <h3 style={{ margin: 0, marginBottom: '12px', color: 'white', fontSize: '1.05rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                📊 Resumen del Mes
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-yellow)' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>TOTAL PARES MES</div>
+                  <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 800 }}>
+                    {operatorNomina?.totalPairs ?? 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>prs</span>
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-green)' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>GANADO MES</div>
+                  <div style={{ color: 'var(--accent-green)', fontSize: '1.2rem', fontWeight: 800 }}>
+                    ${(Number(operatorNomina?.totalEarned) || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                {operatorNomina?.totalAdvances ? (
+                  <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #ef4444' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>ADELANTOS / AVANCES</div>
+                    <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 800 }}>
+                      -${(Number(operatorNomina.totalAdvances) || 0).toLocaleString()}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-blue)', gridColumn: operatorNomina?.totalAdvances ? 'auto' : 'span 2' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600 }}>NETO MES PROYECTADO</div>
+                  <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: 800 }}>
+                    ${(Number(operatorNomina?.netEarned ?? operatorNomina?.totalEarned) || 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
 
