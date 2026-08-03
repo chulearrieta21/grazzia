@@ -762,9 +762,20 @@ def calcular_nomina():
             adelantos_por_op[str(a.id_operario)] += a.monto
             
         resultado = []
+        end_date_real = end_date - timedelta(days=1)
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date_real.strftime("%Y-%m-%d")
+        if start_str == end_str:
+            periodo_txt = start_date.strftime("%d/%m/%Y")
+        else:
+            periodo_txt = f"{start_date.strftime('%d/%m/%Y')} a {end_date_real.strftime('%d/%m/%Y')}"
+
         for user_id, record in nomina_dict.items():
             record["totalAdvances"] = adelantos_por_op.get(user_id, 0.0)
             record["netEarned"] = record["totalEarned"] - record["totalAdvances"]
+            record["startDate"] = start_str
+            record["endDate"] = end_str
+            record["periodo"] = periodo_txt
             
             # Convertir sets a listas para que sean JSON-serializable
             if "detalleReferencias" in record:

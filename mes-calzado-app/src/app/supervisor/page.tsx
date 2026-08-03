@@ -2053,19 +2053,79 @@ export default function SupervisorDashboard() {
                 className="modern-input"
                 style={{ width: 'auto', padding: '8px 12px' }}
                 value={payrollQuincena}
-                onChange={(e) => setPayrollQuincena(e.target.value as any)}
+                onChange={(e) => {
+                  const val = e.target.value as any
+                  setPayrollQuincena(val)
+                  if (val !== 'PERSONALIZADA') {
+                    fetchPayroll(selectedMonth, val)
+                  }
+                }}
               >
                 <option value="MES">Mes completo</option>
                 <option value="Q1">Quincena 1 (1-15)</option>
                 <option value="Q2">Quincena 2 (16-final)</option>
-                <option value="PERSONALIZADA">Fechas específicas</option>
+                <option value="PERSONALIZADA">Rango de fechas personalizado</option>
               </select>
 
               {payrollQuincena === 'PERSONALIZADA' && (
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <input type="date" className="modern-input" style={{ width: 'auto', padding: '8px 12px' }} value={payrollStartDate} onChange={(e) => setPayrollStartDate(e.target.value)} title="Fecha de Inicio" />
-                  <span style={{ color: 'var(--text-secondary)' }}>-</span>
-                  <input type="date" className="modern-input" style={{ width: 'auto', padding: '8px 12px' }} value={payrollEndDate} onChange={(e) => setPayrollEndDate(e.target.value)} title="Fecha de Fin" />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', background: 'rgba(0,0,0,0.3)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>📅 Rango:</span>
+                  <input
+                    type="date"
+                    className="modern-input"
+                    style={{ width: 'auto', padding: '6px 10px', fontSize: '0.85rem' }}
+                    value={payrollStartDate}
+                    onChange={(e) => {
+                      setPayrollStartDate(e.target.value)
+                      if (e.target.value && payrollEndDate) fetchPayroll(selectedMonth, 'PERSONALIZADA', e.target.value, payrollEndDate)
+                    }}
+                    title="Fecha Inicial"
+                  />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>a</span>
+                  <input
+                    type="date"
+                    className="modern-input"
+                    style={{ width: 'auto', padding: '6px 10px', fontSize: '0.85rem' }}
+                    value={payrollEndDate}
+                    onChange={(e) => {
+                      setPayrollEndDate(e.target.value)
+                      if (payrollStartDate && e.target.value) fetchPayroll(selectedMonth, 'PERSONALIZADA', payrollStartDate, e.target.value)
+                    }}
+                    title="Fecha Final"
+                  />
+                  {/* Botones de preseteo rápido */}
+                  <button
+                    type="button"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(59,130,246,0.2)', color: 'var(--accent-blue)', border: '1px solid var(--accent-blue)', borderRadius: '6px', cursor: 'pointer' }}
+                    onClick={() => {
+                      const now = new Date()
+                      const today = now.toISOString().split('T')[0]
+                      setPayrollStartDate(today)
+                      setPayrollEndDate(today)
+                      fetchPayroll(selectedMonth, 'PERSONALIZADA', today, today)
+                    }}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'rgba(16,185,129,0.2)', color: 'var(--accent-green)', border: '1px solid var(--accent-green)', borderRadius: '6px', cursor: 'pointer' }}
+                    onClick={() => {
+                      const now = new Date()
+                      const day = now.getDay() || 7
+                      const mon = new Date(now)
+                      mon.setDate(now.getDate() - day + 1)
+                      const sun = new Date(now)
+                      sun.setDate(now.getDate() - day + 7)
+                      const sMon = mon.toISOString().split('T')[0]
+                      const sSun = sun.toISOString().split('T')[0]
+                      setPayrollStartDate(sMon)
+                      setPayrollEndDate(sSun)
+                      fetchPayroll(selectedMonth, 'PERSONALIZADA', sMon, sSun)
+                    }}
+                  >
+                    Esta Semana
+                  </button>
                 </div>
               )}
 
@@ -2095,6 +2155,7 @@ export default function SupervisorDashboard() {
                 <thead>
                   <tr>
                     <th>Operario</th>
+                    <th>Fecha / Periodo</th>
                     <th>Detalle por Referencia</th>
                     <th>Total Pares</th>
                     <th>Total Ganado</th>
@@ -2103,10 +2164,11 @@ export default function SupervisorDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {payroll.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin datos de nómina.</td></tr>}
+                  {payroll.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Sin datos de nómina.</td></tr>}
                   {payroll.map((p: any) => (
                     <tr key={p.userId}>
                       <td style={{ fontWeight: 600, color: 'white', verticalAlign: 'top' }}>{p.name}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', verticalAlign: 'top', whiteSpace: 'nowrap' }}>{p.periodo || '—'}</td>
                       <td style={{ fontSize: '0.85rem', verticalAlign: 'top' }}>
                         {p.detalleReferencias && Object.entries(p.detalleReferencias).map(([ref, det]: [string, any]) => (
                           <div key={ref} style={{ marginBottom: '6px', padding: '4px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', borderLeft: '3px solid var(--accent-blue)' }}>

@@ -160,6 +160,7 @@ function ImprimirNominaContent() {
           <thead>
             <tr style={{ borderBottom: '2px solid #0f172a', background: '#f8fafc' }}>
               <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 'bold', color: '#0f172a' }}>Operario</th>
+              <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 'bold', color: '#0f172a' }}>Periodo / Fecha</th>
               <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 'bold', color: '#0f172a' }}>Detalle de Actividad</th>
               <th style={{ textAlign: 'center', padding: '12px 8px', fontWeight: 'bold', color: '#0f172a' }}>Pares</th>
               <th style={{ textAlign: 'right', padding: '12px 8px', fontWeight: 'bold', color: '#0f172a' }}>Total Ganado</th>
@@ -175,6 +176,7 @@ function ImprimirNominaContent() {
               return (
                 <tr key={p.userId || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '12px 8px', fontWeight: 600, color: '#0f172a' }}>{p.name}</td>
+                  <td style={{ padding: '12px 8px', color: '#475569', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{p.periodo || '—'}</td>
                   <td style={{ padding: '12px 8px', color: '#475569', fontSize: '0.85rem' }}>{processesStr || '—'}</td>
                   <td style={{ padding: '12px 8px', textAlign: 'center' }}>{p.totalPairs || 0}</td>
                   <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 500 }}>${p.totalEarned?.toLocaleString() || '0'}</td>
@@ -186,7 +188,7 @@ function ImprimirNominaContent() {
 
             {/* Fila de Totales */}
             <tr style={{ borderTop: '2px solid #0f172a', borderBottom: '2px solid #0f172a', fontWeight: 'bold', background: '#f8fafc' }}>
-              <td colSpan={2} style={{ padding: '14px 8px', color: '#0f172a' }}>TOTALES DEL MES</td>
+              <td colSpan={3} style={{ padding: '14px 8px', color: '#0f172a' }}>TOTALES DEL PERIODO</td>
               <td style={{ padding: '14px 8px', textAlign: 'center' }}>{totals.pairs}</td>
               <td style={{ padding: '14px 8px', textAlign: 'right' }}>${totals.earned.toLocaleString()}</td>
               <td style={{ padding: '14px 8px', textAlign: 'right', color: '#e11d48' }}>${totals.advances.toLocaleString()}</td>
