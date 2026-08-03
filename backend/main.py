@@ -624,19 +624,35 @@ def calcular_nomina():
 
         quincena_param = request.args.get("quincena", "MES")
 
-        if month == 12:
-            next_month_date = datetime(year + 1, 1, 1)
-        else:
-            next_month_date = datetime(year, month + 1, 1)
+        fecha_inicio_param = request.args.get("fecha_inicio")
+        fecha_fin_param = request.args.get("fecha_fin")
 
-        start_date = datetime(year, month, 1)
-        if quincena_param == "Q1":
-            end_date = datetime(year, month, 16)
-        elif quincena_param == "Q2":
-            start_date = datetime(year, month, 16)
-            end_date = next_month_date
-        else:
-            end_date = next_month_date
+        # Configurar start_date y end_date
+        start_date = None
+        end_date = None
+
+        if fecha_inicio_param and fecha_fin_param:
+            try:
+                start_date = datetime.strptime(fecha_inicio_param, "%Y-%m-%d")
+                end_date_inclusive = datetime.strptime(fecha_fin_param, "%Y-%m-%d")
+                end_date = end_date_inclusive + timedelta(days=1)
+            except ValueError:
+                pass
+
+        if not start_date or not end_date:
+            if month == 12:
+                next_month_date = datetime(year + 1, 1, 1)
+            else:
+                next_month_date = datetime(year, month + 1, 1)
+
+            start_date = datetime(year, month, 1)
+            if quincena_param == "Q1":
+                end_date = datetime(year, month, 16)
+            elif quincena_param == "Q2":
+                start_date = datetime(year, month, 16)
+                end_date = next_month_date
+            else:
+                end_date = next_month_date
 
         # Inicializar nomina_dict para todos los operarios activos (no admins)
         operarios = db.query(models.Usuario).filter(models.Usuario.es_admin == False).all()
@@ -1394,8 +1410,9 @@ def registrar_adelanto():
 
         nuevo_adelanto = models.Adelanto(id_operario=operario.id, monto=monto_float, observacion=observacion)
         db.add(nuevo_adelanto)
+        obs_texto = observacion or 'Sin observación'
         registrar_bitacora(db, "AVANCE", "REGISTRAR",
-            f"Avance de ${monto_float:,.0f} registrado a {operario.nombre}. Obs: {observacion or 'Sin observaci\u00f3n'}"
+            f"Avance de ${monto_float:,.0f} registrado a {operario.nombre}. Obs: {obs_texto}"
         )
         db.commit()
         return jsonify({"mensaje": f"Adelanto de ${monto_float:,.0f} registrado a {operario.nombre}."}), 201

@@ -12,6 +12,9 @@ function ImprimirNominaContent() {
   const searchParams = useSearchParams()
   const mes = searchParams.get('mes')
   const quincena = searchParams.get('quincena') || 'MES'
+  const fechaInicio = searchParams.get('fecha_inicio')
+  const fechaFin = searchParams.get('fecha_fin')
+
   const [payrollData, setPayrollData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -19,8 +22,13 @@ function ImprimirNominaContent() {
     // Activa la clase print-mode
     document.body.classList.add('print-mode')
 
-    if (mes) {
-      fetch(`${API}/nomina?mes=${mes}&quincena=${quincena}`)
+    let url = `${API}/nomina?mes=${mes || ''}&quincena=${quincena}`
+    if (quincena === 'PERSONALIZADA' && fechaInicio && fechaFin) {
+      url += `&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`
+    }
+
+    if (mes || (quincena === 'PERSONALIZADA' && fechaInicio && fechaFin)) {
+      fetch(url)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -137,9 +145,9 @@ function ImprimirNominaContent() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 'bold' }}>NÓMINA {quincena === 'Q1' ? '1RA QUINCENA' : quincena === 'Q2' ? '2DA QUINCENA' : 'MENSUAL'}</h2>
+            <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#0f172a', fontWeight: 'bold' }}>NÓMINA {quincena === 'Q1' ? '1RA QUINCENA' : quincena === 'Q2' ? '2DA QUINCENA' : quincena === 'PERSONALIZADA' ? 'PERSONALIZADA' : 'MENSUAL'}</h2>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.1rem', color: '#10b981', fontWeight: 'bold', textTransform: 'uppercase' }}>
-              Mes: {formatMonth(mes)}
+              {quincena === 'PERSONALIZADA' ? `Desde ${fechaInicio} hasta ${fechaFin}` : `Mes: ${formatMonth(mes)}`}
             </p>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
               Generado: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}

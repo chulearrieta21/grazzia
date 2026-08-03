@@ -63,7 +63,9 @@ export default function SupervisorDashboard() {
   const [tab, setTab] = useState<Tab>('Órdenes')
   const [alert, setAlert] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(getCurrMonthStr())
-  const [payrollQuincena, setPayrollQuincena] = useState<'Q1' | 'Q2' | 'MES'>('MES')
+  const [payrollQuincena, setPayrollQuincena] = useState<'Q1' | 'Q2' | 'MES' | 'PERSONALIZADA'>('MES')
+  const [payrollStartDate, setPayrollStartDate] = useState('')
+  const [payrollEndDate, setPayrollEndDate] = useState('')
 
   // Shared data
   const [orders, setOrders] = useState<any[]>([])
@@ -203,10 +205,14 @@ export default function SupervisorDashboard() {
     try { const r = await fetch(`${API}/produccion`); const d = await r.json(); if (Array.isArray(d)) setMovements(d) }
     catch { }
   }
-  const fetchPayroll = async (monthStr?: string, quincenaStr?: string) => {
+  const fetchPayroll = async (monthStr?: string, quincenaStr?: string, startDate?: string, endDate?: string) => {
     const targetMonth = monthStr || selectedMonth
     const targetQuincena = quincenaStr || payrollQuincena
-    try { const r = await fetch(`${API}/nomina?mes=${targetMonth}&quincena=${targetQuincena}`); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
+    let url = `${API}/nomina?mes=${targetMonth}&quincena=${targetQuincena}`
+    if (targetQuincena === 'PERSONALIZADA' && (startDate || payrollStartDate) && (endDate || payrollEndDate)) {
+      url += `&fecha_inicio=${startDate || payrollStartDate}&fecha_fin=${endDate || payrollEndDate}`
+    }
+    try { const r = await fetch(url); const d = await r.json(); if (Array.isArray(d)) setPayroll(d) }
     catch { }
   }
   const fetchOperarios = async () => {
@@ -364,7 +370,8 @@ export default function SupervisorDashboard() {
     fetchAll()
     const interval = setInterval(fetchAll, 8000)
     return () => clearInterval(interval)
-  }, [selectedMonth, payrollQuincena])
+  }, [selectedMonth, payrollQuincena, payrollStartDate, payrollEndDate])
+
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleExportExcel = () => {
@@ -2029,15 +2036,19 @@ export default function SupervisorDashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <h2 style={{ margin: 0 }}>Reporte de Nómina Automatizada</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <label htmlFor="payroll-month" style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.95rem' }}>Mes de Nómina:</label>
-              <input
-                id="payroll-month"
-                type="month"
-                className="modern-input"
-                style={{ width: 'auto', padding: '8px 12px', minWidth: '180px' }}
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
+              {payrollQuincena !== 'PERSONALIZADA' && (
+                <>
+                  <label htmlFor="payroll-month" style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.95rem' }}>Mes:</label>
+                  <input
+                    id="payroll-month"
+                    type="month"
+                    className="modern-input"
+                    style={{ width: 'auto', padding: '8px 12px', minWidth: '150px' }}
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  />
+                </>
+              )}
               <select
                 className="modern-input"
                 style={{ width: 'auto', padding: '8px 12px' }}
@@ -2047,9 +2058,25 @@ export default function SupervisorDashboard() {
                 <option value="MES">Mes completo</option>
                 <option value="Q1">Quincena 1 (1-15)</option>
                 <option value="Q2">Quincena 2 (16-final)</option>
+                <option value="PERSONALIZADA">Fechas específicas</option>
               </select>
+
+              {payrollQuincena === 'PERSONALIZADA' && (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input type="date" className="modern-input" style={{ width: 'auto', padding: '8px 12px' }} value={payrollStartDate} onChange={(e) => setPayrollStartDate(e.target.value)} title="Fecha de Inicio" />
+                  <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                  <input type="date" className="modern-input" style={{ width: 'auto', padding: '8px 12px' }} value={payrollEndDate} onChange={(e) => setPayrollEndDate(e.target.value)} title="Fecha de Fin" />
+                </div>
+              )}
+
               <button
-                onClick={() => window.open(`/imprimir/nomina?mes=${selectedMonth}&quincena=${payrollQuincena}`, '_blank')}
+                onClick={() => {
+                  let url = `/imprimir/nomina?mes=${selectedMonth}&quincena=${payrollQuincena}`
+                  if (payrollQuincena === 'PERSONALIZADA') {
+                    url += `&fecha_inicio=${payrollStartDate}&fecha_fin=${payrollEndDate}`
+                  }
+                  window.open(url, '_blank')
+                }}
                 className="btn-export-pdf"
               >
                 Exportar PDF

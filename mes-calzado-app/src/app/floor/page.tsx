@@ -265,7 +265,7 @@ export default function FloorTerminal() {
         {/* Panel izquierdo: Nómina del Operario (2 Tarjetas Compactas) */}
         {operator && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: '1', minWidth: '340px', maxWidth: '440px' }}>
-            
+
             {/* Cabecera / Identidad del Operario */}
             <div className="glass-card" style={{ padding: '15px 20px', borderColor: 'var(--accent-blue)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
