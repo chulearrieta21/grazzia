@@ -368,8 +368,6 @@ export default function SupervisorDashboard() {
 
   useEffect(() => {
     fetchAll()
-    const interval = setInterval(fetchAll, 8000)
-    return () => clearInterval(interval)
   }, [selectedMonth, payrollQuincena, payrollStartDate, payrollEndDate])
 
 
