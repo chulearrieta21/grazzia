@@ -1462,5 +1462,78 @@ def listar_bitacora():
         ])
 
 
+# ── Consulta de Producción Detallada del Operario ──────────────────────────────
+@app.route("/api/v1/operario/mi-produccion", methods=["GET"])
+def obtener_mi_produccion():
+    qr = request.args.get("qr")
+    op_id = request.args.get("operario_id")
+
+    with next(get_db()) as db:
+        query = db.query(models.Usuario)
+        if qr:
+            operario = query.filter(models.Usuario.codigo_qr == qr).first()
+        elif op_id:
+            try:
+                operario = query.filter(models.Usuario.id == int(op_id)).first()
+            except ValueError:
+                operario = None
+        else:
+            return jsonify({"detail": "Debe proporcionar el parámetro 'qr' u 'operario_id'."}), 400
+
+        if not operario:
+            return jsonify({"detail": "Operario no encontrado."}), 404
+
+        # Resumen general del operario
+        resumen = calcular_resumen_operario(db, operario.id)
+
+        # Historial completo de producciones registradas
+        producciones = db.query(models.Produccion).options(
+            joinedload(models.Produccion.lote).joinedload(models.Lote.orden)
+        ).filter(
+            models.Produccion.id_operario == operario.id
+        ).order_by(models.Produccion.fecha_registro.desc()).limit(300).all()
+
+        from collections import defaultdict
+        historial = []
+        detalle_refs = defaultdict(lambda: {"pares": 0, "valor": 0.0, "proceso": ""})
+
+        for p in producciones:
+            orden = p.lote.orden if p.lote else None
+            ref = orden.referencia if orden else "Sin referencia"
+            color = orden.color if orden else ""
+            ref_key = f"{ref} ({color})" if color else ref
+
+            historial.append({
+                "id": p.id,
+                "fecha": p.fecha_registro.isoformat(),
+                "fecha_formateada": p.fecha_registro.strftime("%d/%m/%Y %H:%M"),
+                "lote_id": p.id_lote,
+                "orden_id": orden.id if orden else "",
+                "cliente": orden.cliente if orden else "",
+                "referencia": ref,
+                "color": color,
+                "proceso": p.proceso_realizado,
+                "pares": p.pares_realizados,
+                "valor": p.valor_pagar
+            })
+
+            detalle_refs[ref_key]["pares"] += p.pares_realizados
+            detalle_refs[ref_key]["valor"] += p.valor_pagar
+            detalle_refs[ref_key]["proceso"] = p.proceso_realizado
+
+        return jsonify({
+            "operario": {
+                "id": operario.id,
+                "nombre": operario.nombre,
+                "rol": operario.rol,
+                "codigo_qr": operario.codigo_qr,
+                "tipo_pago": operario.tipo_pago
+            },
+            "resumen": resumen,
+            "historial": historial,
+            "detalle_referencias": dict(detalle_refs)
+        })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
