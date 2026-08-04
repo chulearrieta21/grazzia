@@ -119,15 +119,16 @@ export default function FloorTerminal() {
           triggerStats(opNombre, opRol, data.resumen)
         }
 
-        try {
-          const resNom = await fetch(`${API}/nomina`)
-          const nominaData = await resNom.json()
-          if (Array.isArray(nominaData)) {
-            const opIdStr = data.operario?.id ? String(data.operario.id) : String(data.operario)
-            const myNomina = nominaData.find(n => n.userId === opIdStr)
-            setOperatorNomina(myNomina)
-          }
-        } catch { }
+        const opIdStr = data.operario?.id ? String(data.operario.id) : String(data.operario)
+        fetch(`${API}/nomina`)
+          .then(r => r.json())
+          .then(nominaData => {
+            if (Array.isArray(nominaData)) {
+              const myNomina = nominaData.find((n: any) => n.userId === opIdStr)
+              setOperatorNomina(myNomina)
+            }
+          })
+          .catch(() => {})
 
         if (data.tipo_pago === 'por_dia') {
           setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
@@ -177,15 +178,16 @@ export default function FloorTerminal() {
           triggerStats(opNombre, opRol, data.resumen)
         }
 
-        try {
-          const resNom = await fetch(`${API}/nomina`)
-          const nominaData = await resNom.json()
-          if (Array.isArray(nominaData)) {
-            const opIdStr = operator?.id ? String(operator.id) : ''
-            const myNomina = nominaData.find(n => n.userId === opIdStr)
-            setOperatorNomina(myNomina)
-          }
-        } catch { }
+        const opIdStr = operator?.id ? String(operator.id) : ''
+        fetch(`${API}/nomina`)
+          .then(r => r.json())
+          .then(nominaData => {
+            if (Array.isArray(nominaData)) {
+              const myNomina = nominaData.find((n: any) => n.userId === opIdStr)
+              setOperatorNomina(myNomina)
+            }
+          })
+          .catch(() => {})
 
         setMessage({
           type: 'success',
