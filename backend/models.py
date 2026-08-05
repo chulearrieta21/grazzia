@@ -147,3 +147,12 @@ class Bitacora(Base):
     descripcion = Column(String(500), nullable=False)   # Texto legible del evento
     detalle = Column(String(1000), nullable=True)       # JSON / texto adicional
     fecha = Column(DateTime, default=colombia_now)
+
+
+class Configuracion(Base):
+    """Configuración general del sistema (clave del supervisor, etc.)."""
+    __tablename__ = "configuracion"
+
+    clave = Column(String(100), primary_key=True)
+    valor = Column(String(500), nullable=False)
+

@@ -1535,5 +1535,51 @@ def obtener_mi_produccion():
         })
 
 
+# ── Autenticación y Seguridad del Supervisor ──────────────────────────────
+def obtener_pin_supervisor(db):
+    cfg = db.query(models.Configuracion).filter(models.Configuracion.clave == "pin_supervisor").first()
+    if not cfg:
+        cfg = models.Configuracion(clave="pin_supervisor", valor="1937")
+        db.add(cfg)
+        db.commit()
+        db.refresh(cfg)
+    return cfg.valor
+
+@app.route("/api/v1/supervisor/login", methods=["POST"])
+def login_supervisor():
+    datos = request.json or {}
+    pin_ingresado = str(datos.get("pin", "")).strip()
+    with next(get_db()) as db:
+        pin_actual = obtener_pin_supervisor(db)
+        if pin_ingresado == pin_actual:
+            return jsonify({"authenticated": True, "mensaje": "Acceso concedido al panel de supervisor."})
+        return jsonify({"authenticated": False, "detail": "PIN de acceso incorrecto."}), 401
+
+@app.route("/api/v1/supervisor/cambiar-pin", methods=["POST"])
+def cambiar_pin_supervisor():
+    datos = request.json or {}
+    pin_actual_ingresado = str(datos.get("pin_actual", "")).strip()
+    pin_nuevo = str(datos.get("pin_nuevo", "")).strip()
+
+    if not pin_nuevo or len(pin_nuevo) < 4:
+        return jsonify({"detail": "El nuevo PIN debe tener al menos 4 caracteres."}), 400
+
+    with next(get_db()) as db:
+        pin_actual = obtener_pin_supervisor(db)
+        if pin_actual_ingresado != pin_actual:
+            return jsonify({"detail": "El PIN actual es incorrecto."}), 401
+
+        cfg = db.query(models.Configuracion).filter(models.Configuracion.clave == "pin_supervisor").first()
+        if cfg:
+            cfg.valor = pin_nuevo
+        else:
+            cfg = models.Configuracion(clave="pin_supervisor", valor=pin_nuevo)
+            db.add(cfg)
+
+        registrar_bitacora(db, "SEGURIDAD", "EDITAR", "Se cambió el PIN de acceso del Panel de Supervisor.")
+        db.commit()
+        return jsonify({"mensaje": "PIN del supervisor actualizado con éxito."})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

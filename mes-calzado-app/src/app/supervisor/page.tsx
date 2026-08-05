@@ -99,6 +99,89 @@ export default function SupervisorDashboard() {
   const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set())
   const [selectedOperarios, setSelectedOperarios] = useState<Set<number>>(new Set())
 
+  // Autenticación por PIN del Supervisor
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+  const [pinInput, setPinInput] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+
+  // Modal para cambiar clave
+  const [showCambiarPinModal, setShowCambiarPinModal] = useState(false)
+  const [pinActual, setPinActual] = useState('')
+  const [pinNuevo, setPinNuevo] = useState('')
+  const [pinConfirmar, setPinConfirmar] = useState('')
+  const [cambiarPinError, setCambiarPinError] = useState('')
+
+  // Verificar sessionStorage al cargar la pestaña
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const auth = sessionStorage.getItem('supervisor_auth')
+      if (auth === 'true') {
+        setIsAuthenticated(true)
+      }
+    }
+  }, [])
+
+  const verifyPinAuto = async (pinVal: string) => {
+    if (!pinVal.trim()) return
+    setAuthLoading(true)
+    setAuthError('')
+    try {
+      const res = await fetch(`${API}/supervisor/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinVal.trim() })
+      })
+      const data = await res.json()
+      if (res.ok && data.authenticated) {
+        sessionStorage.setItem('supervisor_auth', 'true')
+        setIsAuthenticated(true)
+        setPinInput('')
+      } else {
+        setAuthError(data.detail || 'PIN de acceso incorrecto.')
+      }
+    } catch {
+      setAuthError('Error al conectar con el servidor local.')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handlePinInputChange = (val: string) => {
+    setPinInput(val)
+    if (val.trim().length >= 4) {
+      verifyPinAuto(val.trim())
+    }
+  }
+
+  const handleCambiarPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCambiarPinError('')
+    if (pinNuevo !== pinConfirmar) {
+      setCambiarPinError('El nuevo PIN y la confirmación no coinciden.')
+      return
+    }
+    try {
+      const res = await fetch(`${API}/supervisor/cambiar-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin_actual: pinActual.trim(), pin_nuevo: pinNuevo.trim() })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        showAlert(data.mensaje || 'PIN actualizado con éxito.', 'success')
+        setShowCambiarPinModal(false)
+        setPinActual('')
+        setPinNuevo('')
+        setPinConfirmar('')
+      } else {
+        setCambiarPinError(data.detail || 'Error al cambiar la clave.')
+      }
+    } catch {
+      setCambiarPinError('Error de red al actualizar la clave.')
+    }
+  }
+
   // Order form
   const [orderId, setOrderId] = useState('')
   const [client, setClient] = useState('')
@@ -367,8 +450,10 @@ export default function SupervisorDashboard() {
   }
 
   useEffect(() => {
-    fetchAll()
-  }, [selectedMonth, payrollQuincena, payrollStartDate, payrollEndDate])
+    if (isAuthenticated) {
+      fetchAll()
+    }
+  }, [isAuthenticated, selectedMonth, payrollQuincena, payrollStartDate, payrollEndDate])
 
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -964,16 +1049,171 @@ export default function SupervisorDashboard() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  if (!isAuthenticated) {
+    return (
+      <div className="dashboard-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '85vh' }}>
+        <div className="glass-card" style={{ maxWidth: '440px', width: '100%', padding: '2.5rem 2rem', textAlign: 'center', borderColor: 'rgba(59, 130, 246, 0.4)' }}>
+          <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '60px', marginBottom: '1.25rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white', marginBottom: '6px' }}>
+            🔒 Panel de Supervisor
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.75rem' }}>
+            Ingresa el PIN de seguridad. Se validará automáticamente.
+          </p>
+
+          <form onSubmit={e => { e.preventDefault(); if (pinInput) verifyPinAuto(pinInput); }}>
+            <div style={{ marginBottom: '1.25rem' }}>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="Ingresar PIN"
+                value={pinInput}
+                onChange={e => handlePinInputChange(e.target.value)}
+                autoFocus
+                className="modern-input"
+                style={{
+                  fontSize: '1.8rem',
+                  letterSpacing: '8px',
+                  textAlign: 'center',
+                  padding: '12px',
+                  borderColor: 'rgba(59, 130, 246, 0.5)'
+                }}
+              />
+            </div>
+
+            {authLoading && (
+              <p style={{ color: 'var(--accent-blue)', fontWeight: 600, fontSize: '0.9rem', margin: '0.5rem 0' }}>
+                ⏳ Validando PIN...
+              </p>
+            )}
+
+            {authError && (
+              <div style={{ marginBottom: '1.25rem', padding: '10px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid var(--accent-red)', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem' }}>
+                ⚠️ {authError}
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard-container">
       {/* Header */}
-      <div className="dashboard-header">
-        <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '50px', marginBottom: '1.5rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
-        <h1>Dashboard de Supervisor</h1>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '1.1rem' }}>
-          Monitoreo y control de la producción · Calzado GRAZZIA
-        </p>
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <img src="/logo.png" alt="GRAZZIA Logo" style={{ height: '50px', marginBottom: '1rem', filter: 'invert(1)', mixBlendMode: 'screen' }} />
+          <h1 style={{ margin: 0 }}>Dashboard de Supervisor</h1>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.3rem', fontSize: '1rem' }}>
+            Monitoreo y control de la producción · Calzado GRAZZIA
+          </p>
+        </div>
+        <div>
+          <button
+            onClick={() => setShowCambiarPinModal(true)}
+            className="btn-secondary"
+            style={{
+              padding: '10px 16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            🔑 Cambiar Clave
+          </button>
+        </div>
       </div>
+
+      {/* Modal Cambiar Clave */}
+      {showCambiarPinModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="glass-card" style={{ maxWidth: '420px', width: '90%', padding: '2rem' }}>
+            <h2 style={{ marginTop: 0, fontSize: '1.3rem', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🔑 Cambiar Clave del Supervisor
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Actualiza el PIN de acceso numérico al panel de administración.
+            </p>
+
+            {cambiarPinError && (
+              <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid var(--accent-red)', borderRadius: '8px', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                ⚠️ {cambiarPinError}
+              </div>
+            )}
+
+            <form onSubmit={handleCambiarPinSubmit}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="modern-label" style={{ fontSize: '0.85rem' }}>PIN Actual</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  className="modern-input"
+                  placeholder="Ej: 1937"
+                  value={pinActual}
+                  onChange={e => setPinActual(e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="modern-label" style={{ fontSize: '0.85rem' }}>Nuevo PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  className="modern-input"
+                  placeholder="Ingresa 4 a 6 dígitos"
+                  value={pinNuevo}
+                  onChange={e => setPinNuevo(e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="modern-label" style={{ fontSize: '0.85rem' }}>Confirmar Nuevo PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  required
+                  className="modern-input"
+                  placeholder="Repite el nuevo PIN"
+                  value={pinConfirmar}
+                  onChange={e => setPinConfirmar(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCambiarPinModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ padding: '8px 18px', borderRadius: '8px', background: 'var(--accent-blue)', color: 'white', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Guardar Nueva Clave
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Alert */}
       {alert && <Alert msg={alert.msg} type={alert.type} onClose={() => setAlert(null)} />}
