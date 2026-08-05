@@ -1159,7 +1159,7 @@ export default function SupervisorDashboard() {
                   maxLength={6}
                   required
                   className="modern-input"
-                  placeholder="Ej: 1937"
+                  placeholder="••••"
                   value={pinActual}
                   onChange={e => setPinActual(e.target.value)}
                 />
@@ -1173,7 +1173,7 @@ export default function SupervisorDashboard() {
                   maxLength={6}
                   required
                   className="modern-input"
-                  placeholder="Ingresa 4 a 6 dígitos"
+                  placeholder="••••"
                   value={pinNuevo}
                   onChange={e => setPinNuevo(e.target.value)}
                 />
@@ -1187,7 +1187,7 @@ export default function SupervisorDashboard() {
                   maxLength={6}
                   required
                   className="modern-input"
-                  placeholder="Repite el nuevo PIN"
+                  placeholder="••••"
                   value={pinConfirmar}
                   onChange={e => setPinConfirmar(e.target.value)}
                 />
