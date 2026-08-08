@@ -451,26 +451,8 @@ def registrar_produccion():
         ).first():
             return jsonify({"detail": f"Doble cobro: '{operario.rol}' ya fue registrado en {lote.id}."}), 400
 
-        # ── Validar orden de procesos ──────────────────────────────────────────
-        proceso_actual = db.query(models.Proceso).filter(
-            func.lower(models.Proceso.nombre) == func.lower(operario.rol)
-        ).first()
-        if proceso_actual:
-            # Obtener el proceso anterior en secuencia
-            proceso_anterior = db.query(models.Proceso).filter(
-                models.Proceso.orden < proceso_actual.orden
-            ).order_by(models.Proceso.orden.desc()).first()
-
-            if proceso_anterior:
-                # Verificar si el proceso anterior fue completado para esta orden
-                completado_anterior = db.query(models.Produccion).join(models.Lote).filter(
-                    models.Lote.id_orden == orden.id,
-                    func.lower(models.Produccion.proceso_realizado) == func.lower(proceso_anterior.nombre)
-                ).first()
-                if not completado_anterior:
-                    return jsonify({
-                        "detail": f"Orden de proceso incumplida: el proceso anterior '{proceso_anterior.nombre}' aun no ha sido completado para la orden '{orden.id}'."
-                    }), 400
+        # ── Validar orden de procesos (REMOVIDO) ──────────────────────────────
+        # Se eliminó la obligación de registrar en estricto orden secuencial.
         # ──────────────────────────────────────────────────────────────────────
 
         precio = resolver_tarifa(db, orden, operario)
