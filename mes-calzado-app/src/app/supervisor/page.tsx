@@ -30,10 +30,30 @@ interface BitacoraEntry { id: number; tipo: string; accion: string; descripcion:
 // ── Alerts ───────────────────────────────────────────────────────────────────
 function Alert({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
-    <div className={`alert ${type === 'success' ? 'alert-success' : 'alert-error'}`}
-      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span>{type === 'success' ? '✅' : '⚠️'} {msg}</span>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+    <div style={{
+      position: 'fixed',
+      top: '24px',
+      right: '24px',
+      zIndex: 9999,
+      background: type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+      color: 'white',
+      padding: '16px 24px',
+      borderRadius: '12px',
+      boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      animation: 'slideInRightBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+    }} onClick={onClose}>
+      <span style={{ fontSize: '1.2rem' }}>{type === 'success' ? '✅' : '⚠️'}</span>
+      <span>{msg}</span>
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, height: '4px',
+        background: 'rgba(255,255,255,0.4)', width: '100%',
+        animation: 'shrinkProgress 5s linear forwards'
+      }} />
     </div>
   )
 }

@@ -129,15 +129,17 @@ export default function FloorTerminal() {
               setOperatorNomina(myNomina)
             }
           })
-          .catch(() => {})
+          .catch(() => { })
 
         if (data.tipo_pago === 'por_dia') {
-          setMessage({ type: 'success', text: data.mensaje || 'Registro guardado exitosamente.' })
+          setMessage({ type: 'success', text: `Se registró con éxito. ${data.mensaje || 'Registro guardado exitosamente.'}` })
+          setTimeout(() => setMessage(prev => prev.type === 'success' ? { type: '', text: '' } : prev), 5000)
           setUserQr('')
           setTimeout(() => userQrRef.current?.focus(), 50)
         } else if (data.tipo_pago === 'por_produccion') {
           setOperator(data.operario)
           setMessage({ type: 'success', text: `Operario ${data.operario.nombre} (${data.operario.rol}) listo. Escanea la orden.` })
+          setTimeout(() => setMessage(prev => prev.type === 'success' ? { type: '', text: '' } : prev), 4000)
           setTimeout(() => batchIdRef.current?.focus(), 50)
         }
       }
@@ -188,12 +190,13 @@ export default function FloorTerminal() {
               setOperatorNomina(myNomina)
             }
           })
-          .catch(() => {})
+          .catch(() => { })
 
         setMessage({
           type: 'success',
-          text: `¡Éxito! ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}`
+          text: `Se registró con éxito. ${data.proceso} registrado por ${data.operario}. Valor: $${data.valor_ganado?.toLocaleString()}`
         })
+        setTimeout(() => setMessage(prev => prev.type === 'success' ? { type: '', text: '' } : prev), 5000)
         setUserQr('')
         setBatchId('')
         setOperator(null)
@@ -274,12 +277,27 @@ export default function FloorTerminal() {
             <p>Sistema de Escaneo Cero Digitación - GRAZZIA</p>
           </div>
 
+          {/* Toast Notification (success/error) */}
           {message.text && (
-            <div className={`alert ${message.type === 'error' ? 'alert-error' : 'alert-success'}`}>
-              {message.type === 'error' ? '⚠️ ' : '✅ '}
-              {message.text}
+            <div style={{
+              position: 'fixed', top: '24px', right: '24px', zIndex: 9999,
+              background: message.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+              color: 'white', padding: '16px 24px', borderRadius: '12px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: '12px',
+              fontWeight: '600', cursor: 'pointer',
+              animation: 'slideInRightBanner 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            }} onClick={() => setMessage({ type: '', text: '' })}>
+              <span style={{ fontSize: '1.2rem' }}>{message.type === 'error' ? '⚠️' : '✅'}</span>
+              <span>{message.text}</span>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, height: '4px',
+                background: 'rgba(255,255,255,0.4)', width: '100%',
+                animation: message.type === 'error' ? 'shrinkProgress 4s linear forwards' : 'shrinkProgress 5s linear forwards'
+              }} />
             </div>
           )}
+
+
 
           {loading && <p style={{ color: 'var(--accent-blue)', textAlign: 'center', marginBottom: '1rem' }}>Procesando...</p>}
 
