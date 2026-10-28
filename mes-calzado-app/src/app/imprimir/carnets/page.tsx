@@ -6,7 +6,7 @@ import '../print.css' // Reuse the print CSS from the orders
 
 const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api/v1'
-  : 'https://grazzia-backend.onrender.com/api/v1'
+  : 'https://calzado.fundacionsemillasparaemprender.com/api/v1'
 
 export default function ImprimirCarnets() {
   const [operarios, setOperarios] = useState<any[]>([])

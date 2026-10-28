@@ -5,7 +5,7 @@ import Link from 'next/link'
 
 const API = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? 'http://localhost:8000/api/v1'
-  : 'https://grazzia-backend.onrender.com/api/v1'
+  : 'https://calzado.fundacionsemillasparaemprender.com/api/v1'
 
 interface OperarioData {
   id: number
