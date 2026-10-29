@@ -2426,7 +2426,7 @@ export default function SupervisorDashboard() {
               </button>
             </div>
           </div>
-          {/* ── KPI Summary Cards ── */}
+          {/* ── KPI Summary Cards (Sober & Executive) ── */}
           {(() => {
             const filteredPayroll = payroll.filter((p: any) => {
               if (!payrollSearch.trim()) return true
@@ -2439,36 +2439,36 @@ export default function SupervisorDashboard() {
 
             return (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.9rem', marginBottom: '1.25rem' }}>
-                  <div className="glass-card" style={{ padding: '0.9rem 1.1rem', background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>👥 Operarios</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white', marginTop: '2px' }}>{filteredPayroll.length}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                  <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Operarios</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', marginTop: '3px' }}>{filteredPayroll.length}</div>
                   </div>
-                  <div className="glass-card" style={{ padding: '0.9rem 1.1rem', background: 'rgba(251,191,36,0.04)', borderColor: 'rgba(251,191,36,0.3)' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>👟 Total Producción</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24', marginTop: '2px' }}>{totalPairsAll.toLocaleString()} <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>pares</span></div>
+                  <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Total Producción</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', marginTop: '3px' }}>{totalPairsAll.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-secondary)' }}>pares</span></div>
                   </div>
-                  <div className="glass-card" style={{ padding: '0.9rem 1.1rem', background: 'rgba(59,130,246,0.04)', borderColor: 'rgba(59,130,246,0.3)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>💰 Nómina Bruta</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'white', marginTop: '2px' }}>${totalEarnedAll.toLocaleString()}</div>
+                  <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Nómina Bruta</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'white', marginTop: '3px', fontFamily: 'monospace' }}>${totalEarnedAll.toLocaleString()}</div>
                   </div>
-                  <div className="glass-card" style={{ padding: '0.9rem 1.1rem', background: 'rgba(239,68,68,0.04)', borderColor: 'rgba(239,68,68,0.3)' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>🔻 Adelantos</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f87171', marginTop: '2px' }}>{totalAdvancesAll > 0 ? `-$${totalAdvancesAll.toLocaleString()}` : '$0'}</div>
+                  <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Adelantos</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: totalAdvancesAll > 0 ? '#fca5a5' : 'white', marginTop: '3px', fontFamily: 'monospace' }}>{totalAdvancesAll > 0 ? `-$${totalAdvancesAll.toLocaleString()}` : '$0'}</div>
                   </div>
-                  <div className="glass-card" style={{ padding: '0.9rem 1.1rem', background: 'rgba(16,185,129,0.08)', borderColor: 'rgba(16,185,129,0.5)' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>💵 Total a Pagar</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#34d399', marginTop: '2px' }}>${totalNetAll.toLocaleString()}</div>
+                  <div className="glass-card" style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.14)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Total a Pagar</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'white', marginTop: '3px', fontFamily: 'monospace' }}>${totalNetAll.toLocaleString()}</div>
                   </div>
                 </div>
 
-                <div className="glass-card" style={{ padding: '1.25rem', borderColor: 'rgba(16,185,129,0.3)' }}>
+                <div className="glass-card" style={{ padding: '1.25rem', borderColor: 'rgba(255,255,255,0.08)' }}>
                   {/* Barra de Búsqueda y Controles de la Tabla */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1', minWidth: '220px', maxWidth: '380px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1', minWidth: '220px', maxWidth: '360px' }}>
                       <input
                         type="text"
-                        placeholder="🔍 Buscar operario por nombre..."
+                        placeholder="Buscar operario por nombre..."
                         className="modern-input"
                         style={{ padding: '7px 12px', fontSize: '0.85rem', width: '100%' }}
                         value={payrollSearch}
@@ -2491,34 +2491,35 @@ export default function SupervisorDashboard() {
                         style={{
                           padding: '6px 12px',
                           fontSize: '0.8rem',
-                          background: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.1)',
                           borderRadius: '8px',
                           color: 'var(--text-secondary)',
                           cursor: 'pointer',
-                          fontWeight: 600,
+                          fontWeight: 500,
                           transition: 'all 0.2s'
                         }}
                       >
                         {expandedPayrollRows.size === filteredPayroll.length && filteredPayroll.length > 0
-                          ? '▲ Contraer todos'
-                          : '▼ Desplegar todos'}
+                          ? 'Contraer todos'
+                          : 'Desplegar todos'}
                       </button>
                       <button
                         onClick={() => fetchPayroll(selectedMonth, payrollQuincena)}
                         style={{
                           padding: '6px 12px',
                           fontSize: '0.8rem',
-                          background: 'rgba(59,130,246,0.15)',
-                          border: '1px solid var(--accent-blue)',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.12)',
                           borderRadius: '8px',
-                          color: 'var(--accent-blue)',
+                          color: 'var(--text-secondary)',
                           cursor: 'pointer',
-                          fontWeight: 600
+                          fontWeight: 500,
+                          transition: 'all 0.2s'
                         }}
                         title="Recargar datos de nómina"
                       >
-                        🔄 Recargar
+                        Recargar
                       </button>
                     </div>
                   </div>
@@ -2556,7 +2557,7 @@ export default function SupervisorDashboard() {
                               <tr
                                 style={{
                                   borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                                  background: isExpanded ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                                  background: isExpanded ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
                                   transition: 'background 0.2s'
                                 }}
                               >
@@ -2565,14 +2566,14 @@ export default function SupervisorDashboard() {
                                   <button
                                     onClick={() => toggleExpandPayroll(p.userId)}
                                     style={{
-                                      background: isExpanded ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.05)',
-                                      border: '1px solid ' + (isExpanded ? 'var(--accent-blue)' : 'rgba(255,255,255,0.15)'),
+                                      background: isExpanded ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
+                                      border: '1px solid rgba(255,255,255,0.12)',
                                       borderRadius: '6px',
-                                      color: isExpanded ? '#60a5fa' : 'white',
-                                      width: '28px',
-                                      height: '28px',
+                                      color: 'white',
+                                      width: '26px',
+                                      height: '26px',
                                       cursor: 'pointer',
-                                      fontSize: '0.75rem',
+                                      fontSize: '0.72rem',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -2586,7 +2587,7 @@ export default function SupervisorDashboard() {
 
                                 {/* Nombre y Rol */}
                                 <td style={{ verticalAlign: 'middle', padding: '10px 12px' }}>
-                                  <div style={{ fontWeight: 700, color: 'white', fontSize: '0.95rem' }}>
+                                  <div style={{ fontWeight: 600, color: 'white', fontSize: '0.92rem' }}>
                                     {p.name}
                                   </div>
                                   {mainProcess && (
@@ -2607,108 +2608,105 @@ export default function SupervisorDashboard() {
                                     <button
                                       onClick={() => toggleExpandPayroll(p.userId)}
                                       style={{
-                                        background: isExpanded ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)',
-                                        border: '1px solid ' + (isExpanded ? 'var(--accent-blue)' : 'rgba(255,255,255,0.15)'),
-                                        color: isExpanded ? '#93c5fd' : '#e2e8f0',
-                                        padding: '5px 12px',
-                                        borderRadius: '8px',
-                                        fontSize: '0.8rem',
+                                        background: isExpanded ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.12)',
+                                        color: '#e2e8f0',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.78rem',
                                         cursor: 'pointer',
-                                        fontWeight: 600,
+                                        fontWeight: 500,
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '6px',
                                         transition: 'all 0.2s'
                                       }}
                                     >
-                                      <span>📋</span>
                                       <span>{refCount} {refCount === 1 ? 'referencia' : 'referencias'}</span>
-                                      <span style={{ fontSize: '0.72rem', opacity: 0.7 }}>
-                                        {isExpanded ? '▲ Ocultar' : '▼ Ver desglose'}
+                                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                        {isExpanded ? '▲' : '▼'}
                                       </span>
                                     </button>
 
                                     {p.processesCount?.['Horas Trabajadas'] ? (
-                                      <span style={{ padding: '3px 8px', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '6px', fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>
-                                        ⏱️ {p.processesCount['Horas Trabajadas']}h
+                                      <span style={{ padding: '3px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                        {p.processesCount['Horas Trabajadas']}h
                                       </span>
                                     ) : null}
                                   </div>
                                 </td>
 
                                 {/* Total Pares */}
-                                <td style={{ color: '#fbbf24', fontWeight: 700, verticalAlign: 'middle', textAlign: 'right', fontSize: '0.95rem', padding: '10px 12px' }}>
+                                <td style={{ color: 'white', fontWeight: 600, verticalAlign: 'middle', textAlign: 'right', fontSize: '0.92rem', padding: '10px 12px' }}>
                                   {p.totalPairs > 0 ? `${p.totalPairs}` : '—'}
                                 </td>
 
                                 {/* Total Bruto */}
-                                <td style={{ color: 'white', verticalAlign: 'middle', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.92rem', padding: '10px 12px' }}>
+                                <td style={{ color: '#cbd5e1', verticalAlign: 'middle', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.9rem', padding: '10px 12px' }}>
                                   ${(p.totalEarned || 0).toLocaleString()}
                                 </td>
 
                                 {/* Adelantos */}
-                                <td style={{ color: p.totalAdvances > 0 ? '#f87171' : 'var(--text-secondary)', verticalAlign: 'middle', textAlign: 'right', fontWeight: p.totalAdvances > 0 ? 600 : 400, padding: '10px 12px' }}>
+                                <td style={{ color: p.totalAdvances > 0 ? '#fca5a5' : 'var(--text-secondary)', verticalAlign: 'middle', textAlign: 'right', fontWeight: p.totalAdvances > 0 ? 500 : 400, padding: '10px 12px', fontFamily: 'monospace' }}>
                                   {p.totalAdvances > 0 ? `-$${p.totalAdvances.toLocaleString()}` : '—'}
                                 </td>
 
                                 {/* Neto a Pagar */}
-                                <td style={{ color: '#34d399', fontWeight: 800, fontSize: '1.15rem', verticalAlign: 'middle', textAlign: 'right', padding: '10px 12px' }}>
+                                <td style={{ color: 'white', fontWeight: 700, fontSize: '1.05rem', verticalAlign: 'middle', textAlign: 'right', padding: '10px 12px', fontFamily: 'monospace' }}>
                                   ${(p.netEarned || 0).toLocaleString()}
                                 </td>
                               </tr>
 
                               {/* ── Sub-Fila Desplegable con Detalle Organizado ── */}
                               {isExpanded && (
-                                <tr style={{ background: 'rgba(15, 23, 42, 0.45)' }}>
-                                  <td colSpan={8} style={{ padding: '0.5rem 1.25rem 1.25rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                <tr style={{ background: 'rgba(0, 0, 0, 0.25)' }}>
+                                  <td colSpan={8} style={{ padding: '0.5rem 1rem 1.25rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                                     <div
                                       style={{
-                                        background: 'rgba(15, 23, 42, 0.9)',
-                                        border: '1px solid rgba(59, 130, 246, 0.3)',
-                                        borderLeft: '4px solid var(--accent-blue)',
-                                        borderRadius: '10px',
-                                        padding: '1rem 1.25rem',
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                                        background: 'rgba(15, 23, 42, 0.75)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderLeft: '3px solid rgba(255, 255, 255, 0.3)',
+                                        borderRadius: '8px',
+                                        padding: '0.85rem 1.1rem',
+                                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
                                       }}
                                     >
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.45rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <span style={{ fontSize: '1rem' }}>📦</span>
-                                          <span style={{ fontWeight: 700, color: 'white', fontSize: '0.92rem' }}>
-                                            Desglose de Producción: <span style={{ color: 'var(--accent-blue)' }}>{p.name}</span>
+                                          <span style={{ fontWeight: 600, color: 'white', fontSize: '0.88rem' }}>
+                                            Desglose: <span>{p.name}</span>
                                           </span>
-                                          <span style={{ background: 'rgba(59,130,246,0.2)', color: '#93c5fd', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
-                                            {refCount} {refCount === 1 ? 'referencia' : 'referencias'}
+                                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                                            ({refCount} {refCount === 1 ? 'referencia' : 'referencias'})
                                           </span>
                                         </div>
                                         <button
                                           onClick={() => toggleExpandPayroll(p.userId)}
                                           style={{
-                                            background: 'rgba(255,255,255,0.05)',
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '6px',
+                                            background: 'transparent',
+                                            border: 'none',
                                             color: 'var(--text-secondary)',
-                                            padding: '3px 8px',
+                                            padding: '2px 6px',
                                             cursor: 'pointer',
                                             fontSize: '0.75rem'
                                           }}
                                         >
-                                          ✕ Cerrar desglose
+                                          ✕ Cerrar
                                         </button>
                                       </div>
 
                                       {refCount > 0 ? (
                                         <div style={{ overflowX: 'auto' }}>
-                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                                             <thead>
-                                              <tr style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                                <th style={{ padding: '8px 12px', fontWeight: 600 }}>#</th>
-                                                <th style={{ padding: '8px 12px', fontWeight: 600 }}>Referencia (Color)</th>
-                                                <th style={{ padding: '8px 12px', fontWeight: 600 }}>Proceso / Labor</th>
-                                                <th style={{ padding: '8px 12px', fontWeight: 600 }}>Órdenes</th>
-                                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Pares</th>
-                                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Tarifa / Par</th>
-                                                <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>Subtotal</th>
+                                              <tr style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                                <th style={{ padding: '7px 10px', fontWeight: 600 }}>#</th>
+                                                <th style={{ padding: '7px 10px', fontWeight: 600 }}>Referencia (Color)</th>
+                                                <th style={{ padding: '7px 10px', fontWeight: 600 }}>Proceso</th>
+                                                <th style={{ padding: '7px 10px', fontWeight: 600 }}>Órdenes</th>
+                                                <th style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>Pares</th>
+                                                <th style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>Tarifa</th>
+                                                <th style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>Subtotal</th>
                                               </tr>
                                             </thead>
                                             <tbody>
@@ -2718,31 +2716,31 @@ export default function SupervisorDashboard() {
                                                   <tr
                                                     key={ref}
                                                     style={{
-                                                      borderBottom: '1px solid rgba(255,255,255,0.04)',
-                                                      background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'
+                                                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                                      background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'
                                                     }}
                                                   >
-                                                    <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                                    <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
                                                       {idx + 1}
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', color: 'white', fontWeight: 600 }}>
+                                                    <td style={{ padding: '7px 10px', color: 'white', fontWeight: 500 }}>
                                                       {ref}
                                                     </td>
-                                                    <td style={{ padding: '8px 12px' }}>
-                                                      <span style={{ background: 'rgba(59,130,246,0.15)', color: '#93c5fd', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                    <td style={{ padding: '7px 10px' }}>
+                                                      <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid rgba(255,255,255,0.08)' }}>
                                                         {det.proceso}
                                                       </span>
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                                                    <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
                                                       {det.ordenes && det.ordenes.length > 0 ? det.ordenes.map((o: string) => `OP-${o}`).join(', ') : '—'}
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#fbbf24', fontWeight: 700 }}>
+                                                    <td style={{ padding: '7px 10px', textAlign: 'right', color: 'white', fontWeight: 600 }}>
                                                       {det.pares}
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                                    <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                                                       ${unitPrice.toLocaleString()}
                                                     </td>
-                                                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#34d399', fontWeight: 700, fontFamily: 'monospace' }}>
+                                                    <td style={{ padding: '7px 10px', textAlign: 'right', color: 'white', fontWeight: 600, fontFamily: 'monospace' }}>
                                                       ${Number(det.valor).toLocaleString()}
                                                     </td>
                                                   </tr>
@@ -2750,15 +2748,15 @@ export default function SupervisorDashboard() {
                                               })}
                                             </tbody>
                                             <tfoot>
-                                              <tr style={{ borderTop: '2px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', fontWeight: 700, color: 'white' }}>
-                                                <td colSpan={4} style={{ padding: '10px 12px' }}>
-                                                  TOTALES DE {p.name}:
+                                              <tr style={{ borderTop: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', fontWeight: 600, color: 'white' }}>
+                                                <td colSpan={4} style={{ padding: '8px 10px', color: 'var(--text-secondary)' }}>
+                                                  Total {p.name}:
                                                 </td>
-                                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#fbbf24' }}>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', color: 'white' }}>
                                                   {p.totalPairs} pares
                                                 </td>
                                                 <td></td>
-                                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#34d399', fontSize: '0.95rem' }}>
+                                                <td style={{ padding: '8px 10px', textAlign: 'right', color: 'white', fontFamily: 'monospace' }}>
                                                   ${(p.totalEarned || 0).toLocaleString()}
                                                 </td>
                                               </tr>
@@ -2766,7 +2764,7 @@ export default function SupervisorDashboard() {
                                           </table>
                                         </div>
                                       ) : (
-                                        <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                                        <p style={{ color: 'var(--text-secondary)', margin: '0.4rem 0', fontStyle: 'italic', fontSize: '0.82rem' }}>
                                           No hay referencias individuales registradas para este periodo.
                                         </p>
                                       )}
@@ -2782,22 +2780,22 @@ export default function SupervisorDashboard() {
                       {/* ── Totales Generales de la Empresa ── */}
                       {filteredPayroll.length > 0 && (
                         <tfoot>
-                          <tr style={{ borderTop: '2px solid rgba(16,185,129,0.4)', background: 'rgba(16,185,129,0.06)', fontWeight: 700 }}>
-                            <td colSpan={2} style={{ padding: '12px 14px', color: 'white' }}>
-                              TOTALES GENERALES ({filteredPayroll.length} {filteredPayroll.length === 1 ? 'operario' : 'operarios'})
+                          <tr style={{ borderTop: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)', fontWeight: 600 }}>
+                            <td colSpan={2} style={{ padding: '12px 14px', color: 'white', fontSize: '0.88rem' }}>
+                              Totales Generales ({filteredPayroll.length} {filteredPayroll.length === 1 ? 'operario' : 'operarios'})
                             </td>
                             <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>—</td>
                             <td style={{ padding: '12px 14px', color: 'var(--text-secondary)' }}>—</td>
-                            <td style={{ padding: '12px 14px', color: '#fbbf24', textAlign: 'right', fontSize: '1rem' }}>
+                            <td style={{ padding: '12px 14px', color: 'white', textAlign: 'right', fontSize: '0.95rem' }}>
                               {totalPairsAll.toLocaleString()}
                             </td>
                             <td style={{ padding: '12px 14px', color: 'white', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.95rem' }}>
                               ${totalEarnedAll.toLocaleString()}
                             </td>
-                            <td style={{ padding: '12px 14px', color: '#f87171', textAlign: 'right' }}>
+                            <td style={{ padding: '12px 14px', color: totalAdvancesAll > 0 ? '#fca5a5' : 'var(--text-secondary)', textAlign: 'right', fontFamily: 'monospace' }}>
                               {totalAdvancesAll > 0 ? `-$${totalAdvancesAll.toLocaleString()}` : '$0'}
                             </td>
-                            <td style={{ padding: '12px 14px', color: '#34d399', textAlign: 'right', fontSize: '1.2rem', fontWeight: 800 }}>
+                            <td style={{ padding: '12px 14px', color: 'white', textAlign: 'right', fontSize: '1.1rem', fontWeight: 700, fontFamily: 'monospace' }}>
                               ${totalNetAll.toLocaleString()}
                             </td>
                           </tr>
